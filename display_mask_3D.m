@@ -3,6 +3,7 @@ function display_mask_3D(data, varargin)
 % 
 %   Inputs
 %       data: structure containing image and mask
+%       varargin: structure containing points and hull information
 %   
 %   Outputs
 %       None, will open a GUI to display images with overlayed masks.
@@ -14,7 +15,8 @@ function display_mask_3D(data, varargin)
     
     % Set defaults
     [i, channels, colors, ch, color, c, z, t, T, B, n, em_vis,...
-        im_vis, im_field, mask_field, im_type, im_ind, tf_circle, hull_vis, pts_vis] = set_defaults(data);
+        im_vis, im_field, mask_field, im_type, im_ind, hull_vis,...
+        pts_vis] = set_defaults(data);
 
     % Save image and mask
     [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
@@ -71,28 +73,15 @@ function display_mask_3D(data, varargin)
     g3.Layout.Column = [1 6];
 
     % Set all the row heights to fit so that the sliders fit, and set the
-    % width of the label column as well as the width of the +/- buttons
-    % column, but allow the slider column to fill remain column width
+    % width of the label column as well as the width of the <> buttons
+    % column, but allow the slider column to fill remaining column width
     g3.RowHeight = {'fit', 'fit', 'fit'};
     g3.ColumnWidth = {75, '1x', 40, 40, 40};
 
-%      % Create a nested gridlayout with 4 rows and 3 columns for the buttons
-%     g4 = uigridlayout(g1, [4, 3], 'Scrollable','on');
-% 
-%     % Set the new gidlayout in the fourth row and first column
-%     g4.Layout.Row = 4;
-%     g4.Layout.Column = 1;
-% 
-%     % Set the first and last row, and first and last column to 1x so that
-%     % the buttons are centered. Set the rest of the rows to fit so the
-%     % label is readable. Set the width of the second column to a fixed 100
-%     % so that it doesn't change.
-%     g4.RowHeight = {'1x', 'fit', 'fit', '1x'};
-%     g4.ColumnWidth = {'1x', 100, '1x'};
-
     % Initialize the figure with the first image
-    [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-            data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+    [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask, ch,...
+        c, B, T, data, i, em_vis, im_vis, n, color, hull_vis, pts_vis,...
+        varargin{:});
     
     % If image is a z-stack
     if size(im,3) > 1
@@ -112,7 +101,7 @@ function display_mask_3D(data, varargin)
 
         % Create a push button for decreasing z
         minus_z = uibutton(g3,'push',...
-                       'Text', '-',...
+                       'Text', '<',...
                        'HorizontalAlignment', 'center',...
                        'VerticalAlignment', 'center',...
                        'FontSize', 20,...
@@ -122,7 +111,7 @@ function display_mask_3D(data, varargin)
     
         % Create a push button for increasing z
         plus_z = uibutton(g3,'push',...
-                       'Text', '+',...
+                       'Text', '>',...
                        'HorizontalAlignment', 'center',...
                        'VerticalAlignment', 'center',...
                        'FontSize', 20,...
@@ -162,7 +151,7 @@ function display_mask_3D(data, varargin)
 
         % Create a push button for decreasing time
         minus_t = uibutton(g3,'push',...
-                       'Text', '-',...
+                       'Text', '<',...
                        'HorizontalAlignment', 'center',...
                        'VerticalAlignment', 'center',...
                        'FontSize', 20,...
@@ -172,7 +161,7 @@ function display_mask_3D(data, varargin)
     
         % Create a push button for increasing time
         plus_t = uibutton(g3,'push',...
-                       'Text', '+',...
+                       'Text', '>',...
                        'HorizontalAlignment', 'center',...
                        'VerticalAlignment', 'center',...
                        'FontSize', 20,...
@@ -209,7 +198,7 @@ function display_mask_3D(data, varargin)
 
         % Create a push button for decreasing threshold
         minus_T = uibutton(g3,'push',...
-                       'Text', '-',...
+                       'Text', '<',...
                        'HorizontalAlignment', 'center',...
                        'VerticalAlignment', 'center',...
                        'FontSize', 20,...
@@ -219,7 +208,7 @@ function display_mask_3D(data, varargin)
     
         % Create a push button for increasing threshold
         plus_T = uibutton(g3,'push',...
-                       'Text', '+',...
+                       'Text', '>',...
                        'HorizontalAlignment', 'center',...
                        'VerticalAlignment', 'center',...
                        'FontSize', 20,...
@@ -257,7 +246,6 @@ function display_mask_3D(data, varargin)
     lbl_exp.Layout.Column = 2;
 
     % Create a dropdown menu for changing which movie/image to display
-    %[fig_pos(3), fig_pos(4), 100, 22],...
     exp = uidropdown(g2, 'Items', {data.name},...
                          'Value', data(1).name,...
                          'ValueChangedFcn',...
@@ -276,11 +264,12 @@ function display_mask_3D(data, varargin)
     mask_btn = uibutton(g2,'state',...
                    'Text', 'Display Mask',...
                    'valueChangedFcn',...
-                             @(mask_btn, events) maskButtonPushed(mask_btn, events));
+                             @(mask_btn, events) maskButtonPushed(...
+                                mask_btn, events));
     mask_btn.Layout.Row = 3;
     mask_btn.Layout.Column = 3;
 
-    % Label for the mask overlaying button
+    % Label for the circling detected spots button
     lbl_circle_btn = uilabel(g2, 'Text', 'Toggle on/off spots',...
                           'HorizontalAlignment', 'left',...
                           'WordWrap', 'on');
@@ -291,26 +280,29 @@ function display_mask_3D(data, varargin)
     circle_btn = uibutton(g2,'state',...
                    'Text', 'Circle Spots',...
                    'valueChangedFcn',...
-                             @(circle_btn, events) circleButtonPushed(circle_btn, events));
+                             @(circle_btn, events) circleButtonPushed(...
+                                circle_btn, events));
     circle_btn.Layout.Row = 4;
     circle_btn.Layout.Column = 3;
 
-    % Label for the mask overlaying button
+    % Label for the plotting convex hull button
     lbl_hull_btn = uilabel(g2, 'Text', 'Toggle on/off convex hull',...
                           'HorizontalAlignment', 'left',...
                           'WordWrap', 'on');
     lbl_hull_btn.Layout.Row = 5;
     lbl_hull_btn.Layout.Column = 2;
 
-    % Create a push button for circling the detected spots on the image
+    % Create a push button for plotting the convex hull on the image
     hull_btn = uibutton(g2,'state',...
                    'Text', 'Display Convex Hull',...
                    'valueChangedFcn',...
-                             @(hull_btn, events) hullButtonPushed(hull_btn, events));
+                             @(hull_btn, events) hullButtonPushed(...
+                                hull_btn, events));
     hull_btn.Layout.Row = 5;
     hull_btn.Layout.Column = 3;
 
-    % Label for the dropdown menu for selecting which color channel to display
+    % Label for the dropdown menu for selecting which color channel to
+    % display
     lbl_dd1 = uilabel(g2, 'Text', 'Choose image channel',...
                           'HorizontalAlignment', 'left',...
                           'WordWrap', 'on');
@@ -325,7 +317,8 @@ function display_mask_3D(data, varargin)
     dd1.Layout.Row = 6;
     dd1.Layout.Column = 3;
 
-    % Label for the dropdown menu to choose which color to display the mask in
+    % Label for the dropdown menu to choose which color to display the mask
+    % in
     lbl_dd2 = uilabel(g2, 'Text', 'Choose color of mask',...
                           'HorizontalAlignment', 'left',...
                           'WordWrap', 'on');
@@ -390,19 +383,20 @@ function display_mask_3D(data, varargin)
 
         % Create a push button for decreasing the data set/image
         minus_i = uibutton(g3,'push',...
-                       'Text', '-',...
+                       'Text', '<',...
                        'Enable', false,...
                        'ButtonPushedFcn',...
                            @(btn, events) minusiButtonPushed(btn, events));
     
-        % Create a push button increasing the data set/image
+        % Create a push button for increasing the data set/image
         plus_i = uibutton(g3,'push',...
-                       'Text', '+',...
+                       'Text', '>',...
                        'ButtonPushedFcn',...
                             @(btn, events) plusiButtonPushed(btn, events));
 
         % Label for the button for displaying embryo ellipse
-        lbl_b1 = uilabel(g2, 'Text', 'Toggle on/off ellipse fit to embryo',...
+        lbl_b1 = uilabel(g2, 'Text',...
+                                'Toggle on/off ellipse fit to embryo',...
                              'HorizontalAlignment', 'left',...
                              'WordWrap', 'on');
         lbl_b1.Layout.Row = 9;
@@ -419,7 +413,8 @@ function display_mask_3D(data, varargin)
         b1.Layout.Column = 3;
 
         % Label for the button for displaying signal ellipse
-        lbl_b2 = uilabel(g2, 'Text', 'Toggle on/off ellipse fit to signal',...
+        lbl_b2 = uilabel(g2, 'Text',...
+                                'Toggle on/off ellipse fit to signal',...
                              'HorizontalAlignment', 'left',...
                              'WordWrap', 'on');
         lbl_b2.Layout.Row = 10;
@@ -453,8 +448,9 @@ function display_mask_3D(data, varargin)
                             sld_z, edt_z);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Change the z slice slider value so it is discrete
@@ -468,8 +464,9 @@ function display_mask_3D(data, varargin)
                             sld_z, edt_z);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
     % Create the function for the callback for when the minus z button is
@@ -479,8 +476,9 @@ function display_mask_3D(data, varargin)
                                     sld_z, edt_z, 'minus');
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Create the function for the callback to the plus z button
@@ -489,8 +487,9 @@ function display_mask_3D(data, varargin)
                                     sld_z, edt_z, 'plus');
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Change the time value when the slider is moved
@@ -499,8 +498,9 @@ function display_mask_3D(data, varargin)
                             sld_t, edt_t);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Change the time slider value so it is discrete
@@ -514,8 +514,9 @@ function display_mask_3D(data, varargin)
                             sld_t, edt_t);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
     % Create the function for the callback to the minus button for time
@@ -525,8 +526,9 @@ function display_mask_3D(data, varargin)
                                     sld_t, edt_t, 'minus');
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Create the function for the callback to the plus button for time
@@ -536,8 +538,9 @@ function display_mask_3D(data, varargin)
                                     sld_t, edt_t, 'plus');
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
     % Change the threshold value when the slider is moved
@@ -546,8 +549,9 @@ function display_mask_3D(data, varargin)
                             plus_T, minus_T, sld_T, edt_T);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Change the threshold slider value so it is discrete
@@ -561,30 +565,32 @@ function display_mask_3D(data, varargin)
             plus_T, minus_T, sld_T, edt_T);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
     % Create the function for the callback to the minus button for
     % threshold
     function minusTButtonPushed(~, ~)
-        T = plusminusXButtonPushed(T, size(data(i).threshold,2), plus_T, minus_T,...
-                                    sld_T, edt_T, 'minus');
+        T = plusminusXButtonPushed(T, size(data(i).threshold,2), plus_T,...
+                                minus_T, sld_T, edt_T, 'minus');
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
-    % Create the function for the callback to the plus button for time
-    % index
+    % Create the function for the callback to the plus button for threshold
     function plusTButtonPushed(~, ~)
-        T = plusminusXButtonPushed(T, size(data(i).threshold,2), plus_T, minus_T,...
-                                    sld_T, edt_T, 'plus');
+        T = plusminusXButtonPushed(T, size(data(i).threshold,2), plus_T,...
+                                minus_T, sld_T, edt_T, 'plus');
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Function to update value of brightness for image
@@ -600,8 +606,9 @@ function display_mask_3D(data, varargin)
         end
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Create callback for the dropdown menu to select the experiment
@@ -609,8 +616,11 @@ function display_mask_3D(data, varargin)
         % Find the index of the experiment with experiment name that
         % matches the value selected in the dropdown menu
         i = find(strcmp({data.name}, dd.Value));
-
+        
+        % If plus_i and minus_i exist, meaning that data is from
+        % quantify_in_situ_.m
         if exist('plus_i', 'var') && exist('minus_i', 'var')
+            % Check limits to determine if plus or minus button is active
             check_limits(i, size(data,2), plus_i, minus_i)
         end
         
@@ -622,24 +632,31 @@ function display_mask_3D(data, varargin)
         % index
         [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
         
+        % If slide for time exists
         if exist('sld_t', 'var')
+            % Change t back to 1 and reset slider
             t = change_exp(sld_t, size(im,4), plus_t, minus_t, edt_t,...
                            true);
         end
-
+        
+        % If slide for z exists
         if exist('sld_z', 'var')
+            % Change z back to 1 and reset slider
             z = change_exp(sld_z, size(im,3), plus_z, minus_z, edt_z,...
                            false);
         end
-
+        
+        % If slide for threshold exists
         if exist('sld_T', 'var')
+            % Change T back to 1 and reset slider
             T = change_exp(sld_T, size(data(i).threshold,2), plus_T,...
                            minus_T, edt_T, false);
         end
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Create the function for the callback when the display mask button is
@@ -656,48 +673,48 @@ function display_mask_3D(data, varargin)
         end
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
-    % Create the function for the callback when the display mask button is
+    % Create the function for the callback when the circle spots button is
     % pushed
     function circleButtonPushed(circle_btn,~)
         % If the button is not clicked
         if circle_btn.Value == false
-            % Set the color to 0,0,0 so the mask is not seen
-            tf_circle = false;
+            % Set the points visibility flag to false
+            pts_vis = false;
         % Elseif the button is clicked
         elseif circle_btn.Value == true
-            % Set the color to the color from the dropdown menu
-            tf_circle = true;
-        end
-
-        % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
-    end
-
-    % Create the function for the callback when the display mask button is
-    % pushed
-    function hullButtonPushed(hull_btn,~)
-        % If the plot embryo ellipse function is not pressed
-        if hull_btn.Value == false
-            % Set the ellipse visibility flag to false
-            hull_vis = false;
-            pts_vis = false;
-        % Elseif the plot embryo ellipse function is pressed
-        elseif hull_btn.Value == true
-            % Set the ellipse visibility flag to true
-            hull_vis = true;
+            % Set the points visibility flag to true
             pts_vis = true;
         end
+
+        % Set visibility handle to show or hide convex hull based on if the
+        % button is pressed
+        if ~isempty(pts_vis)
+            set(p_h, 'Visible', pts_vis);
+        end
+    end
+
+    % Create the function for the callback when the convex hull button is
+    % pushed
+    function hullButtonPushed(hull_btn,~)
+        % If the plot convex hull function is not pressed
+        if hull_btn.Value == false
+            % Set the hull visibility flag to false
+            hull_vis = false;
+        % Elseif the plot convex function is pressed
+        elseif hull_btn.Value == true
+            % Set the hull visibility flag to true
+            hull_vis = true;
+        end
         
-        % Set visibility handle to show or hide ellipse based on if button
-        % is pressed
-        if ~isempty(hull_vis) && ~isempty(pts_vis)
+        % Set visibility handle to show or hide convex hull based on if the
+        % button is pressed
+        if ~isempty(hull_vis)
             set(hull_h, 'Visible', hull_vis);
-            set(pts_h, 'Visible', pts_vis);
         end
     end
 
@@ -716,8 +733,9 @@ function display_mask_3D(data, varargin)
         end
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Create callback for when the color is channged from the dropdown menu
@@ -733,8 +751,9 @@ function display_mask_3D(data, varargin)
         end
         
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
     % Create callback for dropdown menu that picks the mask type
@@ -786,8 +805,9 @@ function display_mask_3D(data, varargin)
         end
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Change the experiment/image number value when the slider is moved
@@ -803,8 +823,9 @@ function display_mask_3D(data, varargin)
         [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Change the experiment/image slider value so it is discrete
@@ -827,8 +848,9 @@ function display_mask_3D(data, varargin)
         [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
     
     % Create the function for the callback to the plus button for
@@ -846,8 +868,9 @@ function display_mask_3D(data, varargin)
         [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
 
         % Make the mask overlay and update the image
-        [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin{:});
+        [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin{:});
     end
 
     % Create the function for the callback to the plot embryo ellipse
@@ -891,9 +914,10 @@ function display_mask_3D(data, varargin)
     end
 end
 
-function [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c, B, T,...
-                data, i, em_vis, im_vis, n, color, tf_circle, hull_vis, pts_vis, varargin)
-%DISPLAY_IMAGE Overlays mask and displays it
+function [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
+                ch, c, B, T, data, i, em_vis, im_vis, n, color,...
+                hull_vis, pts_vis, varargin)
+%DISPLAY_IMAGE Overlays mask or plots points and convex hull and displays
 % 
 %   Inputs
 %       uiax: axis handle to axis in the uifigure
@@ -911,32 +935,45 @@ function [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c
 %           embryo should be displayed
 %       im_vis:true or false to determine if ellipse for the signal/
 %           image should be displayed
+%       n: the index to the image field, mask field, and mask dimension
+%       color: the current color for the points
+%       hull_vis: true or false to determine if convex hull is visible
+%       pts_vis: true or false to determine if points are visible
+%       varargin: structure containing points and hull information
 %   
 %   Outputs
 %       em_h: handle to the background/embryo ellipse plot
 %       im_h: handle to the signal/image ellipse plot
+%       hull_h: handle to the convex hull plot
+%       p_h: handle to the points plot
 % 
 %   Overview
-%       Overlays a mask on an image specified by the inputs. The grayscale
-%       image is converted to RGB, and then the color is determined by
-%       decreasing the appropriate channels to zero where the mask is.
+%       The image is brightend using the set brightness. If a mask is
+%       specified, it is overlaid on the image specified by the inputs. The
+%       grayscale image is converted to RGB, and then the color is
+%       determined by decreasing the appropriate channels to zero where the
+%       mask is. Also plots the centroids and convex hull if the
+%       corresponding buttons were pressed.
     
+    % Clear the axes
     cla(uiax);
-
+    
+    % Set limits to size of image, so only image is displayed
     uiax.XLim = [0 size(im, 2)];
     uiax.YLim = [0 size(im, 1)];
 
     % Set the image based on the brightness factor B
     brighter = imadjust(im(:,:,z,t,ch), [0, B ./ 100]);
-
+    
+    % If the mask variable is not empty
     if ~isempty(mask)
-        % If the image is 8 bit or 16 bit
+        % If the image is 8 bit
         if isa(im, 'uint8') && ~isempty(mask)
             % Make a RGB image where the original image is grayscale
             mask_im = cat(3, uint8(~mask(:,:,z,t,T)).^c(1) .* brighter,...
                              uint8(~mask(:,:,z,t,T)).^c(2) .* brighter,...
                              uint8(~mask(:,:,z,t,T)).^c(3) .* brighter);
-    
+        % Elseif the image is 16 bit
         elseif isa(im, 'uint16')
             % Make a RGB image where the original image is grayscale
             mask_im = cat(3, uint16(~mask(:,:,z,t,T)).^c(1) .* brighter,...
@@ -963,70 +1000,103 @@ function [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c
             im_h = [];
         end
 
-        % If postion data is provided
-        if nargin >= 19 && ~isempty(varargin{1})
-            if tf_circle && ~isempty(varargin{1}(i).rm_pts) && ~isempty(varargin{1}(i).rm_pts{t,1})
+        % If postion data is provided, determined by an extra input
+        % argument and varargin is not empty
+        if nargin >= 18 && ~isempty(varargin{1})
+            % If rm_pts is a field and is not empty
+            if isfield(varargin{1}, 'rm_pts')...
+                    && ~isempty(varargin{1}(i).rm_pts)...
+                    && ~isempty(varargin{1}(i).rm_pts{t,1})
                 hold(uiax,'on');
-                p_h = plot(uiax, varargin{1}(i).rm_pts{t,1}(:,1), varargin{1}(i).rm_pts{t,1}(:,2), ...
-                'o', 'MarkerSize', 12, 'MarkerEdgeColor', color, 'Linewidth', 1);
+                % Plot points from rm_pts which is the list of points with
+                % outliers removed
+                p_h = plot(uiax, varargin{1}(i).rm_pts{t,1}(:,1),...
+                    varargin{1}(i).rm_pts{t,1}(:,2), 'o',...
+                    'MarkerSize', 12,...
+                    'MarkerEdgeColor', color,...
+                    'Linewidth', 1,...
+                    'Visible', pts_vis);
                 hold(uiax,'off');
-            elseif tf_circle && ~isempty(varargin{1}(i).centers{t,1})
+            % Elseif centers is a field and is not empty
+            elseif isfield(varargin{1}, 'centers')...
+                    && ~isempty(varargin{1}(i).centers{t,1})
                 hold(uiax,'on');
-                p_h = plot(uiax, varargin{1}(i).centers{t,1}(:,1), varargin{1}(i).centers{t,1}(:,2), ...
-                'o', 'MarkerSize', 12, 'MarkerEdgeColor', color, 'Linewidth', 1);
+                % Plot points from centers which is the list of points
+                % without outliers removed
+                p_h = plot(uiax, varargin{1}(i).centers{t,1}(:,1),...
+                    varargin{1}(i).centers{t,1}(:,2), 'o',...
+                    'MarkerSize', 12,...
+                    'MarkerEdgeColor', color,...
+                    'Linewidth', 1,...
+                    'Visible', pts_vis);
                 hold(uiax,'off');
+            % Else
             else
+                % set p_h to empty
                 p_h = [];
             end
 
-            % If the data includes the field angle_em_max, which means the data
-            % is from quanitfy_in_situ.m and can plot an ellipse
-            if isfield(varargin{1}, 'nuc_cycle') && ~isempty(varargin{1}(i).pts) && ~isempty(varargin{1}(i).hull_pts)
-                % Call plot_ellipse for the updated data
-                if (t < varargin{1}(i).nuc_cycle(1,2)) && (t > varargin{1}(i).nuc_cycle(1,1))
+            % If the data includes the field nuc_cycle, which means the
+            % data is capable of plotting convex hull, and the pts and
+            % hull_pts are not empty
+            if isfield(varargin{1}, 'nuc_cycle')...
+                    && ~isempty(varargin{1}(i).pts)...
+                    && ~isempty(varargin{1}(i).hull_pts)
+                % If t is less than the bounds of the nuclear cycle
+                % timepoints, determine which index t is a part of and set
+                % true false flag to true for the corresponding nuclear
+                % cycle
+                if (t < varargin{1}(i).nuc_cycle(1,2))...
+                        && (t > varargin{1}(i).nuc_cycle(1,1))
                     index_t = 1;
                     tf_t = true;
-                elseif (t < varargin{1}(i).nuc_cycle(2,2)) && (t > varargin{1}(i).nuc_cycle(2,1))
+                elseif (t < varargin{1}(i).nuc_cycle(2,2))...
+                        && (t > varargin{1}(i).nuc_cycle(2,1))
                     index_t = 2;
                     tf_t = true;
-                elseif (t < varargin{1}(i).nuc_cycle(3,2)) && (t > varargin{1}(i).nuc_cycle(3,1))
+                elseif (t < varargin{1}(i).nuc_cycle(3,2))...
+                        && (t > varargin{1}(i).nuc_cycle(3,1))
                     index_t = 3;
                     tf_t = true;
+                % Else
                 else
+                    % Set true false flag to false
                     tf_t = false;
                 end
                 
+                % If true false flag is true
                 if tf_t
-%                     centers = cat(1, varargin{1}(i).centers{varargin{1}(i).nuc_cycle(index_t,1):varargin{1}(i).nuc_cycle(index_t,2)});
-%                     centers = cat(1, varargin{1}(i).pts{1,index_t});
+                    % Save the indicis of the points that form the hull
                     k = varargin{1}(i).hull_pts{1,index_t};
                     hold(uiax,'on');
-                    hull_h = plot(uiax, varargin{1}(i).pts{1,index_t}(k,1), varargin{1}(i).pts{1,index_t}(k,2), 'cyan', 'Visible', hull_vis);
-%                     pts_h = plot(uiax, centers(:,1), centers(:,2), 'o', 'MarkerSize', 12,...
-%                                  'MarkerEdgeColor', 'cyan', 'Visible', pts_vis);
-                    pts_h = [];
+
+                    % Plot the points of the convex hull with lines
+                    % connecting them
+                    hull_h = plot(uiax,...
+                        varargin{1}(i).pts{1,index_t}(k,1),...
+                        varargin{1}(i).pts{1,index_t}(k,2), 'white',...
+                        'Visible', hull_vis);
                     hold(uiax,'off');
+                % Else if not plotting hull
                 else
                     hull_h = [];
-                    pts_h = [];
                 end
+            % Else if not plotting hull
             else
                 hull_h = [];
-                pts_h = [];
             end
+        % Else if not plotting points or hull
         else
             p_h = [];
             hull_h = [];
-            pts_h = [];
         end
+    % Else if not diplaying mask, points, hull, or ellipses
     else
         mask_im = brighter;
         em_h = [];
         im_h = [];
-
         p_h = [];
         hull_h = [];
-        pts_h = [];
     end
     
     % Convert to 8 bit and display
@@ -1034,24 +1104,21 @@ function [em_h, im_h, hull_h, pts_h] = display_image(uiax, z, t, im, mask, ch, c
     hold(uiax,'on');
     imshow(mask_im, 'Parent', uiax);
     hold(uiax,'off');
-
+    
+    % Set order of the handles of plotted objects to visualize on the image
     uistack(em_h,'top');
     uistack(im_h,'top');
     uistack(hull_h,'top');
-    uistack(pts_h,'top');
     uistack(p_h,'top');
 end
 
-function [i, channels, colors, ch, color, c, z, t, T, B, n,...
-    em_vis,im_vis, im_field, mask_field, im_type, im_ind, idk_circle, hull_vis, pts_vis] = set_defaults(data)
-%CHECK_INPUTS Checks if inputs are entered or uses default values
+function [i, channels, colors, ch, color, c, z, t, T, B, n, em_vis,...
+    im_vis, im_field, mask_field, im_type, im_ind, hull_vis,...
+    pts_vis] = set_defaults(data)
+%SET_DEFAULTS Sets values
 % 
 %   Inputs
 %       data: data structure containing the image data
-%       varargin:
-%           1): names of the fields corresponding to the image, mask, and
-%               name/identifier of the image
-%           2): an integer to determine scale of slider
 %   
 %   Outputs
 %       i: the experiment index
@@ -1069,12 +1136,19 @@ function [i, channels, colors, ch, color, c, z, t, T, B, n,...
 %           background/embyo is visible
 %       im_vis: the flag for if the plotted ellipse for the signal/image is
 %           visible
-%       field: a structure that contains the fieldnames for determining
-%           which fields contain the imagining data
+%       im_field: a structure that contains the fieldnames for determining
+%           which fields contains the imaging data
+%       mask_field: a structure that contains the fieldnames for
+%           determining which fields contain the mask data
+%       im_type: an array with the names of possible names for the drop
+%           down menu
+%       im_ind: an array with the indices that correspond with the
+%           image/mask selection
+%       hull_vis: true/false to determine if convex hull plot is visible
+%       pts_vis: true/false to determine if points plot is visible
 % 
 %   Overview
-%       This function sets the parameters for displaying the mask. If no
-%       inputs are given, this function uses the default values.
+%       This function sets the parameters for the GUI.
     
     i = 1;
     colors = {'Red','Green','Blue','Cyan','Magenta','Yellow'};
@@ -1088,7 +1162,6 @@ function [i, channels, colors, ch, color, c, z, t, T, B, n,...
     n = [1,1,1];
     em_vis = false;
     im_vis = false;
-    idk_circle = false;
     hull_vis = false;
     pts_vis = false;
     
@@ -1126,16 +1199,16 @@ function [i, channels, colors, ch, color, c, z, t, T, B, n,...
 %     end
 
     % Create an array for channel names based on number of channels
-    channels = append('Channel ', ...
-                      string(1:size(im, 5)));
+    channels = append('Channel ', string(1:size(im, 5)));
 end
 
 function [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n)
-%SET_IMAGE_AND_MASK Overlays mask and displays it
+%SET_IMAGE_AND_MASK Updates the image and mask
 % 
 %   Inputs
-%       data: data structure
-%       field: field structure
+%       data: data structure with images
+%       im_field: structure with fieldnames corresponding to the correct
+%           fields in data
 %       i: experiment/image index
 %       n: the index to the image field, mask field, and mask dimension
 %   
@@ -1177,6 +1250,7 @@ function c = pick_color(color)
 %       mask to zero in those channels/dim. Thus array c is the inverse of
 %       a typical color array.
     
+    % Corresponding array for matching color
     switch color
         case 'Red'
             c = [0, 1, 1];
@@ -1194,7 +1268,7 @@ function c = pick_color(color)
 end
 
 function [em_h, im_h] = plot_ellipse(uiax, data, em_vis, im_vis, n)
-%PLOT_ELLIPSE Plots an ellipse.
+%PLOT_ELLIPSE Determines which values to use for plotting an ellipse.
 %   
 %   Input
 %       uiax: the handle to the axes in the gui
@@ -1239,7 +1313,7 @@ end
 
 function h = calc_ellipse_params(uiax, angle_deg, major, minor,...
     center, len, vis, color)
-%PLOT_ELLIPSE Plots an ellipse.
+%CALC_ELLIPSE_PARAMS Determines values for an ellipse and plots.
 %   
 %   Input
 %       uiax: the handle to the axes in the gui
@@ -1247,7 +1321,7 @@ function h = calc_ellipse_params(uiax, angle_deg, major, minor,...
 %       major: major axis of ellipse
 %       minor: minor axis of ellipse
 %       center: center of ellipse
-%       len: len of pixels in microns
+%       len: length/width of square pixels in microns
 %       vis: the flag for determing visibility of ellipse
 % 
 %   Output
@@ -1269,7 +1343,7 @@ function h = calc_ellipse_params(uiax, angle_deg, major, minor,...
 end
 
 function xy = parameterized_ellipse(phi, a, b, alpha, c)
-%PARAM_ELLIPSE Calculates points on an ellipse.
+%PARAMETERIZED_ELLIPSE Calculates points on an ellipse.
 %   
 %   Input
 %       phi: parametric angle
@@ -1397,8 +1471,8 @@ function x = edit_x_update(event, upper_lim, val_flag, plus_x, minus_x,...
 %       event: event where value for x is entered
 %       upper_lim: maximum or upper limit for x value
 %       val_flag: true or false for determining how to calculate values
-%       plus_x: uibutton handle for plus button for x
-%       minus_x: uibutton handle for minus button for x
+%       plus_x: uibutton handle for > button for x
+%       minus_x: uibutton handle for < button for x
 %       sld_x: slider handle for x
 %       edt_x: editable field handle for x
 % 
@@ -1408,7 +1482,7 @@ function x = edit_x_update(event, upper_lim, val_flag, plus_x, minus_x,...
 %   Overview
 %       Updates the value of x when a value is entered into an editable
 %       field for x. In addition, the function makes sure the corresponding
-%       plus and minus buttons are available depending on if the max or min
+%       > and < buttons are available depending on if the max or min
 %       is reached. The slider is also updated. This function works
 %       generically for any editable field (z, t, T etc).
     
@@ -1446,15 +1520,15 @@ function x = edit_x_update(event, upper_lim, val_flag, plus_x, minus_x,...
     end
 end
 
-function x = plusminusXButtonPushed(x, upper_lim, plus_x, minus_x, sld_x,...
-                                edt_x, plus_or_minus)
-%PLUSMINUSXBUTTONPUSHED Updates x if a plus or minus button is clicked
+function x = plusminusXButtonPushed(x, upper_lim, plus_x, minus_x,...
+    sld_x, edt_x, plus_or_minus)
+%PLUSMINUSXBUTTONPUSHED Updates x if a < or > button is clicked
 %   
 %   Input
 %       x: value being changed
 %       upper_lim: maximum or upper limit for x value
-%       plus_x: uibutton handle for plus button for x
-%       minus_x: uibutton handle for minus button for x
+%       plus_x: uibutton handle for > button for x
+%       minus_x: uibutton handle for < button for x
 %       sld_x: slider handle for x
 %       edt_x: editable field handle for x
 %       plus_or_minus: 'plus' or 'minus' for increasing or decreasing by 1
@@ -1474,10 +1548,11 @@ function x = plusminusXButtonPushed(x, upper_lim, plus_x, minus_x, sld_x,...
     % and minus buttons are clickable
     check_limits(x, upper_lim, plus_x, minus_x);
     
-    % If plus was entered
+    % If > was clicked
     if strcmp(plus_or_minus, 'plus')
         % Increase x by one
         x = x + 1;
+    % Else if < was clicked
     elseif strcmp(plus_or_minus, 'minus')
         % Decrease x by 1
         x = x - 1;
@@ -1503,34 +1578,34 @@ function check_limits(x, upper_lim, plus_x, minus_x)
 %   Input
 %       x: value being changed
 %       upper_lim: maximum or upper limit for x value
-%       plus_x: uibutton handle for plus button for x
-%       minus_x: uibutton handle for minus button for x
+%       plus_x: uibutton handle for > button for x
+%       minus_x: uibutton handle for < button for x
 % 
 %   Output
 %       None
 %
 %   Overview
 %       Checks if the new value of x reaches the limits of x, and disables
-%       the corresponding plus or minus button if the maximum or minimum is
+%       the corresponding < or > button if the maximum or minimum is
 %       reached.
 
     % If x is less than the max and greater than or equal to 1 (the
     % minimum)
     if (x < upper_lim) && (x >= 1)
-        % Set the plus button enable to true so it can be clicked
+        % Set the > button enable to true so it can be clicked
         plus_x.Enable = true;
     else
-        % Set plus button enable to false so it cannot be clicked
+        % Set > button enable to false so it cannot be clicked
         plus_x.Enable = false;
     end
 
     % If x is greater than 1 (the minimum) and less than or equal to the
     % max
     if (x > 1) && (x <= upper_lim)
-        % Set the minus button enable to true so it can be clicked
+        % Set the < button enable to true so it can be clicked
         minus_x.Enable = true;
     else
-        % Set the minus button enbable to false so it cannot be clicked
+        % Set the < button enbable to false so it cannot be clicked
         minus_x.Enable = false;
     end
 end
@@ -1542,8 +1617,8 @@ function x = change_exp(sld_x, upper_lim, plus_x, minus_x,...
 %   Input
 %       sld_x: the slider for x
 %       upper_lim: maximum or upper limit for x value
-%       plus_x: uibutton handle for plus button for x
-%       minus_x: uibutton handle for minus button for x
+%       plus_x: uibutton handle for > button for x
+%       minus_x: uibutton handle for < button for x
 %       edt_x: entry field for editing the slider x
 %       tick_flag: true false for setting the tick marks on the slider
 % 
@@ -1552,14 +1627,14 @@ function x = change_exp(sld_x, upper_lim, plus_x, minus_x,...
 %
 %   Overview
 %       This function will reset the slider and associated buttons/fields
-%       when the experiment is changed. Each slider must be reset, however
-%       brightness is not reset.
+%       when the experiment is changed. Each slider must be reset, except
+%       brightness.
     
     % Set the limits for the slider to those of the new experiment
     sld_x.Limits = [1, upper_lim];
     edt_x.Limits = [1, upper_lim];
     
-    % If true
+    % If true to set tick marks
     if tick_flag
         % Major and minor tick marks are set so that the labels are spread
         % out and rounded to the nearest 25
