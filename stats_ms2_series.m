@@ -140,7 +140,9 @@ function [condition, m, T] = handle_inputs(varargin)
                  'dl-BLID NC13 14', 'Light nc13-14', 4, 4, 2;...
                  'dl-LEXY het dark', 'Dark', 2, 4, 1;...
                  'dl-LEXY het two light', 'Two Light Exposures', 4, 4, 2;...
-                 'dl-LEXY het continuous', 'Continuous Light', 3, 4, 3};
+                 'dl-LEXY het continuous', 'Continuous Light', 3, 4, 3;...
+                 'dl-mCh-LEXY dark', 'Dark', 2, 4, 1;...
+                 'dl-mCh-LEXY NC13', 'Light nc13', 4, 4, 2};
     
     % If a condition was entered
     if nargin >= 1 && ~isempty(varargin{1})
@@ -329,7 +331,15 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
                 tbl_tidy.t(tidy_ind) = avg(i).indiv{r}.t(t);
 
                 % Save the number of spots
-                avg(i).indiv{r}.n(t) = size(reps(r).A{t,T}, 1);
+                if isfield(reps, 'n_spots')
+                    avg(i).indiv{r}.n(t) = reps(r).n_spots(t);
+                    temp_n = size(reps(r).A{t,T}, 1);
+                else
+                    if isfield(reps, 'A')
+                        avg(i).indiv{r}.n(t) = size(reps(r).A{t,T}, 1);
+                        temp_n = size(reps(r).A{t,T}, 1);
+                    end
+                end
                 tbl_tidy.n(tidy_ind) = avg(i).indiv{r}.n(t);
                 
                 % Save the replicate number and condition
@@ -337,26 +347,39 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
                 tbl_tidy.condition(tidy_ind) = avg(i).condition{1};
 
                 % If a spot was detected
-                if avg(i).indiv{r}.n(t) ~= 0
+                if ~isempty(reps(r).avg_I{t}) || (avg(i).indiv{r}.n(t) ~= 0 && temp_n ~= 0)
                     % Calculate the average area of all spots at a certain
                     % time point, convert from number of pixels to
                     % microns^2. Calculate means for average intensity, max
                     % intensity, and sum of intensity across spots for each
                     % time point
-                    avg(i).indiv{r}.A(t,1) = mean(reps(r).A{t,T} .*...
+                    if isfield(reps, 'A')
+                        avg(i).indiv{r}.A(t,1) = mean(reps(r).A{t,T} .*...
                                             prod(reps(r).pixel_length,2));
-                    avg(i).indiv{r}.avg_I(t,1) = mean(reps(r).avg_I{t,T});
-                    avg(i).indiv{r}.max_I(t,1) = mean(reps(r).max_I{t,T});
-                    avg(i).indiv{r}.sum_I(t,1) = mean(reps(r).sum_I{t,T});
+                        avg(i).indiv{r}.A(t,2) = calc_error(reps(r).A{t,T} .*...
+                                                prod(reps(r).pixel_length,2), varargin{8}, 1);
+                    end
+
+                    if isfield(reps, 'avg_I')
+                        avg(i).indiv{r}.avg_I(t,1) = mean(reps(r).avg_I{t,T});
+                        avg(i).indiv{r}.avg_I(t,2) = calc_error(reps(r).avg_I{t,T}, varargin{8}, 1);
+                    end
+
+                    if isfield(reps, 'max_I')
+                        avg(i).indiv{r}.max_I(t,1) = mean(reps(r).max_I{t,T});
+                        avg(i).indiv{r}.max_I(t,2) = calc_error(reps(r).max_I{t,T}, varargin{8}, 1);
+                    end
+
+                    if isfield(reps, 'sum_I')
+                        avg(i).indiv{r}.sum_I(t,1) = mean(reps(r).sum_I{t,T});
+                        avg(i).indiv{r}.sum_I(t,2) = calc_error(reps(r).sum_I{t,T}, varargin{8}, 1);
+                    end
 
                     % Calculate the error determined by the inputed value
                     % for area of spots, average intensity, max intensity
                     % and sum of intensities
-                    avg(i).indiv{r}.A(t,2) = calc_error(reps(r).A{t,T} .*...
-                                                prod(reps(r).pixel_length,2), varargin{8}, 1);
-                    avg(i).indiv{r}.avg_I(t,2) = calc_error(reps(r).avg_I{t,T}, varargin{8}, 1);
-                    avg(i).indiv{r}.max_I(t,2) = calc_error(reps(r).max_I{t,T}, varargin{8}, 1);
-                    avg(i).indiv{r}.sum_I(t,2) = calc_error(reps(r).sum_I{t,T}, varargin{8}, 1);
+                    
+                    
                 end
                 
                 % Increment the tidy data set index
@@ -365,7 +388,9 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
 
             % If normalized
             if m == 1
-                time_norm = 'max 13';
+                time_norm = 'max 12';
+%                 max_field = 'n';
+                max_field = 'avg_I';
 
                 % If normalzing by value of inputed time
                 if strcmp(time_norm, 'input')
@@ -374,24 +399,36 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
                 % Elseif normalizing by maximum value
                 elseif strcmp(time_norm, 'max 12')
                     % Save maximum value index to normalize data by
-                    [~, tn] = max(avg(i).indiv{r}.n(reps(r).nuc_cycle(1,1):reps(r).nuc_cycle(1,2),1));
+                    [~, tn] = max(avg(i).indiv{r}.(max_field)(reps(r).nuc_cycle(1,1):reps(r).nuc_cycle(1,2),1));
                     tn = tn + reps(r).nuc_cycle(1,1) - 1;
                 % Elseif normalizing by maximum value
                 elseif strcmp(time_norm, 'max 13')
                     % Save maximum value index to normalize data by
-                    [~, tn] = max(avg(i).indiv{r}.n(reps(r).nuc_cycle(2,1):reps(r).nuc_cycle(2,2),1));
+                    [~, tn] = max(avg(i).indiv{r}.(max_field)(reps(r).nuc_cycle(2,1):reps(r).nuc_cycle(2,2),1));
                     tn = tn + reps(r).nuc_cycle(2,1) - 1;
                 end
                 
                 % Normalize data by value saved in index tn
-                avg(i).indiv{r}.n = avg(i).indiv{r}.n ./ avg(i).indiv{r}.n(tn,1);
-                avg(i).indiv{r}.A = avg(i).indiv{r}.A ./ avg(i).indiv{r}.A(tn,1);
-                avg(i).indiv{r}.avg_I = avg(i).indiv{r}.avg_I ./...
-                                        avg(i).indiv{r}.avg_I(tn,1);
-                avg(i).indiv{r}.max_I = avg(i).indiv{r}.max_I ./...
-                                        avg(i).indiv{r}.max_I(tn,1);
-                avg(i).indiv{r}.sum_I = avg(i).indiv{r}.sum_I ./...
-                                        avg(i).indiv{r}.sum_I(tn,1);
+                if isfield(reps, 'A')
+                    avg(i).indiv{r}.n = avg(i).indiv{r}.n ./...
+                                        avg(i).indiv{r}.n(tn,1);
+                    avg(i).indiv{r}.A = avg(i).indiv{r}.A ./...
+                                        avg(i).indiv{r}.A(tn,1);
+                end
+                if isfield(reps, 'avg_I')
+                    avg(i).indiv{r}.avg_I = avg(i).indiv{r}.avg_I ./...
+                                            avg(i).indiv{r}.avg_I(tn,1);
+                end
+
+                if isfield(reps, 'max_I')
+                    avg(i).indiv{r}.max_I = avg(i).indiv{r}.max_I ./...
+                                            avg(i).indiv{r}.max_I(tn,1);
+                end
+
+                if isfield(reps, 'max_I')
+                    avg(i).indiv{r}.sum_I = avg(i).indiv{r}.sum_I ./...
+                                            avg(i).indiv{r}.sum_I(tn,1);
+                end
             end
             
             if nargin >= 13 && strcmp(varargin{9}, 'area plot')
@@ -465,7 +502,8 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
             % Save the interperolated time
             avg(i).intrp{r}.t = (min_t:0.2:max_t)';
             
-            intrp_field = 'n';
+%             intrp_field = 'n';
+            intrp_field = 'avg_I';
 
             % Interpolate the data for the given time
             avg(i).intrp{r}.(intrp_field) = interp1(avg(i).indiv{r}.t(:,1),...
@@ -1181,7 +1219,8 @@ function [colors, x_label, y_label, y_blue, field] = initiate_plot(n,...
                'Normalized Intensity (arb. unit)'};
     end
 
-    field = {'n'};
+%     field = {'n'};
+    field = {'avg_I'};
 %              'A';
 %              'avg_I';
 %              'max_I';
