@@ -43,15 +43,9 @@ function [im, data] = quantify_nuclei(varargin)
                     'rm_pts', []);
     end
 
-%     % Make a structure for storing data
-%     data = struct('raw_image', cell(1,size(img_in,2)), 'name', [],...
-%                   'nuc_mask', [], 'nuc_center', [],...
-%                   'nuc_indices', [], 'embryo_center', [], 'tracks', [],...
-%                   'areas', [], 'intensities', [], 'positions', [],...
-%                   'spot_indices', []);
-
     % For each data set
     for i = 1:n
+        % If a structure was not the first input
         if ~isstruct(varargin{1})
             % Open image/movie
             [im(i).folder, im(i).name, im(i).raw_image,...
@@ -65,7 +59,8 @@ function [im, data] = quantify_nuclei(varargin)
 
         % Segment nuclei using background fluorescence
         [im(i).mask, data(i).avg_I, data(i).mean_avg_I, data(i).centers,...
-            data(i).spot_indices] = segment_nuclei(im(i).raw_image, im(i).threshold, data(i).t_align);
+            data(i).spot_indices] = segment_nuclei(im(i).raw_image,...
+            im(i).threshold, data(i).t_align);
     end
 
 end
@@ -99,10 +94,12 @@ function [path, embryo_number, im, vox_len, t, raw_t] = open_img(dims)
     % identifier
     file_name_parts = strsplit(name, ' ');
     embryo_number = file_name_parts{1};
-
+    
+    % Use bioformats to read in file
     reader = bfGetReader(path);
     omeMeta = reader.getMetadataStore();
 
+    % Save the size of X, Y, Z, T, and C
     X = omeMeta.getPixelsSizeX(0).getValue();
     Y = omeMeta.getPixelsSizeY(0).getValue();
     Z = omeMeta.getPixelsSizeZ(0).getValue();
@@ -113,10 +110,14 @@ function [path, embryo_number, im, vox_len, t, raw_t] = open_img(dims)
     I = uint16(zeros(X,Y,C,Z));
     I2 = uint16(zeros(X,Y,C,T));
     raw_t = zeros(reader.getImageCount(),1);
-
+    
+    % For each time step
     for t = 1:T
+        % For each z slice
         for z = 1:Z
+            % For each channel
             for c = 1:C
+                % Get the index and save the image
                 i = reader.getIndex(z-1, c-1, t-1)+1;
                 I(:,:,c,z) = bfGetPlane(reader, i);
 
@@ -134,32 +135,24 @@ function [path, embryo_number, im, vox_len, t, raw_t] = open_img(dims)
                 end
             end
         end
+        % Make a mex intensity projection
         I2(:,:,:,t) = max(I, [], 4);
     end
-
+    
+    % Close the open file
     reader.close()
     
-%     % Opens images using Bio-Formats for MATLAB
-%     % https://docs.openmicroscopy.org/bio-formats/6.1.0/users/matlab/index.html
-%     im = bfopen(path);
-    
-%     % Save sizes of images in all dimensions, including time and color
-%     % channels
-%     X = im{1,4}.getPixelsSizeX(0).getValue();
-%     Y = im{1,4}.getPixelsSizeY(0).getValue();
-%     Z = im{1,4}.getPixelsSizeZ(0).getValue();
-%     T = im{1,4}.getPixelsSizeT(0).getValue();
-%     C = im{1,4}.getPixelsSizeC(0).getValue();
-    
-    % The physical length of a pixel
+    % Save the physical length of a pixel in µm
     xy_len = omeMeta.getPixelsPhysicalSizeX(0).value(...
-                            ome.units.UNITS.MICROMETER); % in µm
+                            ome.units.UNITS.MICROMETER);
+    
     % Convert pixel length to a double
     xy_len = xy_len.doubleValue();
 
-    % The physical distance between z slices
+    % Save the physical distance between z slices in µm
     z_len = omeMeta.getPixelsPhysicalSizeZ(0).value(...
-                                ome.units.UNITS.MICROMETER); % in µm
+                                ome.units.UNITS.MICROMETER);
+
     % Convert z length to a double
     z_len = z_len.doubleValue();
     
@@ -171,25 +164,6 @@ function [path, embryo_number, im, vox_len, t, raw_t] = open_img(dims)
         vox_len = cat(2, xy_len, xy_len);
     end
     
-%     % Allocate looped variable
-%     raw_t = zeros(size(im{1,1},1),1);
-    
-%     % For each image plane
-%     for i = 1:size(im{1,1},1)
-%         % Try to get the time that elapsed during image aquisition
-%         % If unable to, then the last z stack is incomplete
-%         try
-%             % Get time bewteen each z slice
-%             raw_t(i,1) = im{1,4}.getPlaneDeltaT(0,...
-%                                     i-1).value.doubleValue./60;
-%             % Set to false since getting the time was a success
-%             delete_last_t = false;
-%         catch
-%             % Set to true since getting the time was a failure
-%             delete_last_t = true;
-%         end
-%     end
-    
     % Reshape time to match the dimensions of channel, z, and time
     raw_t = reshape(raw_t,C,Z,T);
     
@@ -200,25 +174,6 @@ function [path, embryo_number, im, vox_len, t, raw_t] = open_img(dims)
     % Reshape image data to match dimensions, X, Y, z, time, channels
     im = permute(I2, [1,2,5,4,3]);
     
-%     % Reshape image data to match dimensions, X, Y, z, time, channels
-%     im = permute(reshape(cat(3, im{1,1}{:,1}), Y, X, C, Z, T),...
-%                   [1,2,4,5,3]);
-    % Code to open large images in smaller parts
-%     img1 = permute(reshape(cat(3, im{1,1}{1:(250.*C*Z),1}), Y, X, C, Z, 250),...
-%                   [1,2,4,5,3]);
-%     img1 = max(img1, [], 3);
-%     img2 = permute(reshape(cat(3, im{1,1}{((250.*C*Z)+1):end,1}), Y, X, C, Z, T-250),...
-%                   [1,2,4,5,3]);
-%     img2 = max(img2, [], 3);
-% 
-%     im = cat(4, img1,img2);
-
-%     % If 2D is desired
-%     if strcmp(dims, '2D')
-%         % Make a maximum z-projection
-%         im = max(im, [], 3);
-%     end
-    
     % Delete last timepoint if z-stack is incomplete
     if delete_last_t
         im = im(:,:,:,1:(end-1),:);
@@ -226,7 +181,8 @@ function [path, embryo_number, im, vox_len, t, raw_t] = open_img(dims)
     end
 end
 
-function [mask, avg_I, mean_avg_I, centers, ind] = segment_nuclei(im, T, t_align, varargin)
+function [mask, avg_I, mean_avg_I, centers, ind] = segment_nuclei(im, T,...
+    t_align, varargin)
 %SEGMENT_NUCLEI Segments nuclei based on MCP-GFP/RFP background 
 %   The function
 
@@ -242,136 +198,63 @@ function [mask, avg_I, mean_avg_I, centers, ind] = segment_nuclei(im, T, t_align
     mean_avg_I = zeros(size(im, 4), 2);
     centers = cell(size(im, 4), 1);
     ind = cell(size(im, 4), 1);
-%     ac = zeros(size(im, 4), 2);
-%     embryo_center = zeros(size(im, 4), 2);
     
     % For each time point
     for i = 1:size(im,4)
-        
-%         % Gaussian blur
-%         B = imgaussfilt(im(:,:,1,i,1), 20);
-% 
-%         % Threshold for entire embryo
-%         bw = imbinarize(B, 0.05); %0.05
-% 
-%         % Morophologically close image to make a single object
-%         se = strel('disk', 10);
-%         J = imclose(bw, se);
-% 
-%         J = bwareaopen(J, 50000);
-%         
-%         % Get center of embryo
-%         props = regionprops(J, 'Centroid');
-% 
-%         % To approximate mid line
-%         % Take the difference of the mask, this will find edges
-% %         dJ = diff(J, 1, 1);
-%         dJ = diff(J, 1, 2);
-%         q = sum(dJ, 2);
-%         temp_i = false(512,511);
-%         temp_i(:,end) = (q == 1);
-%         dJ(temp_i) = -1;
-%         temp_j = false(512,511);
-%         temp_j(:,1) = (q == -1);
-%         dJ(temp_j) = 1;
-%         
-%         if i == 177
-%             dJ(5:6,508:511) = 0;
-%         end
-% 
-%         % Get the row indices for the edges
-% %         [r,~] = find(dJ);
-%         [~,c] = find(dJ);
-% 
-%         % Reshape the row indices so each the first edge is one row and the
-%         % second edge is the second row, for each pixel in the x dimension
-% %         rr = reshape(r,2,size(im,2));
-% 
-%         cc = reshape(c,size(im,2),2);
-% 
-%         % Find the mid point of each column using average 
-% %         mid = mean(rr,1);
-%         mid = mean(cc,2);
-% 
-%         % Find the slopes using each point. Note the denominator is always
-%         % one so it is left off (this is true because each column is an
-%         % inreger and the difference is 1 between nearest columns)
-%         m = diff(mid);
-% 
-%         % Find the average slope (to account for irregularites in the
-%         % edges)
-% %         avg_m = mean(m);
-%         avg_m = 1./mean(m);
-% 
-%         % Save the slope for calculating the distance to the mid line
-%         ac(i,1) = -avg_m;
-% 
-%         % Save the y-intercept for calculating the distance to the mid line
-%         ac(i,2) = -(props.Centroid(2) - avg_m .* props.Centroid(1));
-% 
-%         % Save the center of the embryo
-%         embryo_center(i,:) = props.Centroid;
-        
-        % Background subtract to remove any uneven illumination
-%         im_bg_subtract = im(:,:,1,i,1) - imgaussfilt(im(:,:,1,i,1), 50);
-%         im_bg_subtract = im(:,:,1,i,1) - imgaussfilt(im(:,:,1,i,1), 50);
-
         % Blur for segmenting nuclei
         B = imgaussfilt(im(:,:,1,i,1), 4);
-
-        % Threshold image for nuclei, note that threshold is different
-        % because of background subtraction
-%         bw = imbinarize(B, .1);
-
+    
+        % If no threshold is provided set it to 0.1
         if isempty(T)
             T = 0.1;
         end
-
+        
+        % If no t_align is provided set it to 100.
         if isempty(t_align)
             t_align = 100;
         end
 
+        % Threshold image, increasing the threshold every image
         bw = imbinarize(B, T+((i-1) * (.00125/t_align)));
 
         % Morophologically open image to disconnect nuclei
         se = strel('disk', 5);
         J = imopen(bw, se);
-
+        
+        % Morphologically close image and fill to remove any holes
         se = strel('disk', 3);
         J = imclose(J, se);
         J = imfill(J,'holes');
 
         % Remove objects/nuclei touching the edge of the image
         J = imclearborder(J);
-
+        
+        % For wathershedding, find the distances in the mask
         D = bwdist(~J);
+
+        % Only keep certain minimums
         J = imhmin(-D,1);
+
+        % Perform watershed
         L = watershed(J);
+
+        % Remove mask of wathershed that's outside of the original mask
         L(~bw) = 0;
+
+        % Convert to logical and filter out small and large objects
         L1 = logical(L);
         mask(:,:,1,i) = bwareafilt(L1,[100,700]);
 
-        % Remove small and large objects
-%         mask(:,:,1,i) = bwareafilt(J, [300,1200]);
-%         mask(:,:,1,i) = bwareafilt(J, [100,300]);
-
-        % Watershed
-%         B = imgaussfilt(im(:,:,1,i), 5);
-%         bw = imbinarize(B, .045);
-%         D = bwdist(~bw);
-%         J = imhmin(-D,1);
-%         L = watershed(J);
-%         L(~bw) = 0;
-%         L1 = logical(L);
-%         mask(:,:,1,i) = bwareafilt(bw2,[300,1200]);
-
-        % Get properties for nuclei including the center, and a list of
-        % pixels in each object
+        % Get properties for nuclei including the center, a list of pixels
+        % in each object, and mean intensity of object
         props = regionprops(mask(:,:,1,i), im(:,:,1,i), 'Centroid',...
             'MeanIntensity', 'PixelIdxList');
         
+        % Save the mean intensities
         avg_I{i} = cat(1, props.MeanIntensity);
         
+        % If there are mean intensities, calculate the mean of mean
+        % intensities
         if ~isempty(avg_I{i})
             mean_avg_I(i,1) = mean(avg_I{i}, 1);
             mean_avg_I(i,2) = calc_error(avg_I{i}, err_method, 1);
@@ -382,7 +265,9 @@ function [mask, avg_I, mean_avg_I, centers, ind] = segment_nuclei(im, T, t_align
 
         % Save list of pixels
         ind{i} = {props.PixelIdxList}';
-
+        
+        % If less than 10 objects were detected it is unlikely those are
+        % real nuclei, so remove all detected data
         if size(avg_I{i}) < 10
             avg_I{i} = [];
             centers{i} = [];
