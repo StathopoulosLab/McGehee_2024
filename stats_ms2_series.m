@@ -126,23 +126,34 @@ function [condition, m, T] = handle_inputs(varargin)
                  'test1', '\itdl-AAAA-Venus', 3, 1, 1;...
                  'control', '\itdl-Venus', 2, 2, 2;...
                  'control1', '\itdl-Venus', 4, 2, 2;...
-                 'dl-LEXY dark', 'Dark', 2, 4, 1;...
-                 'dl-LEXY 10 min', 'Light 10 min', 4, 4, 2;...
-                 'dl-LEXY 20 min', 'Light 20 min', 3, 4, 3;...
-                 'dl-LEXY NC13', 'Light nc13', 4, 4, 2;...
+                 'dl-LEXY dark', 'Dark', 8, 8, 1;...%2, 4, 1;
+                 'dl-LEXY 10 min', 'Light 10 min', 1, 4, 2;...%4, 4, 2;
+                 'dl-LEXY 20 min', 'Light 20 min', 4, 4, 3;...%3, 4, 3;
+                 'dl-LEXY NC11 12', 'Light nc11-12', 9, 4, 3;%1, 4, 3;
+                 'dl-LEXY NC11 13', 'Light nc11-13', 6, 4, 3;...%5, 4, 3;
+                 'dl-LEXY NC13', 'Light nc13', 1, 1, 2;...%4, 4, 2;
                  'dl-LEXY NC13 weird', 'Light nc13', 4, 4, 2;...
-                 'dl-LEXY NC12 14', 'Light nc12&14', 3, 4, 3;...
+                 'dl-LEXY NC12 14', 'Light nc12&14', 6, 6, 3;...%3, 4, 3;
                  'dl-LEXY NC12 14 weird', 'Light nc12&14', 3, 4, 3;...
-                 'dl-LEXY NC13 14', 'Light nc13-14', 4, 4, 2;...
-                 'dl-BLID dark', 'Dark', 2, 4, 1;...
-                 'dl-BLID 10 min', 'Light 10 min', 4, 4, 2;...
-                 'dl-BLID 20 min', 'Light 20 min', 3, 4, 3;...
-                 'dl-BLID NC13 14', 'Light nc13-14', 4, 4, 2;...
+                 'dl-LEXY NC13 14', 'Light nc13-14', 1, 4, 2;...%4, 4, 2;...
+                 'dl-BLID dark', 'Dark', 8, 4, 1;...%2, 4, 1;
+                 'dl-BLID 10 min', 'Light 10 min', 1, 4, 2;...%4, 4, 2;
+                 'dl-BLID 20 min', 'Light 20 min', 4, 4, 3;...%3, 4, 3;
+                 'dl-BLID NC13 14', 'Light nc13-14', 1, 4, 2;...
                  'dl-LEXY het dark', 'Dark', 2, 4, 1;...
                  'dl-LEXY het two light', 'Two Light Exposures', 4, 4, 2;...
                  'dl-LEXY het continuous', 'Continuous Light', 3, 4, 3;...
-                 'dl-mCh-LEXY dark', 'Dark', 2, 4, 1;...
-                 'dl-mCh-LEXY NC13', 'Light nc13', 4, 4, 2};
+                 'dl-mCh-LEXY dark', 'Dark', 8, 4, 1;...%2, 4, 1;
+                 'dl-mCh-LEXY NC13', 'Light nc13', 1, 4, 2;...%4, 4, 2;
+%                  'dl-Venus', 'dl-Venus', 2, 4, 1;...
+%                  'dl-AAAA-Venus', 'dl-AAAA-Venus', 4, 4, 2;...
+                 'dl-LEXY dprox dark', 'Dark', 2, 4, 1;...
+                 'dl-LEXY dprox 10 min', 'Light 10 min', 4, 4, 2;...
+                 'dl-LEXY dprox 20 min', 'Light 20 min', 3, 4, 3;...
+                 'dl-Venus', 'dl-Venus', 1, 5, 1;...
+                 'dl-Venus/df', 'dl-Venus/df', 2, 2, 1;...
+                 'dl-AAAA', 'dl-AAAA', 3, 3, 2;...
+                 'dl-AAAA/df', 'dl-AAAA/df', 4, 4, 1};
     
     % If a condition was entered
     if nargin >= 1 && ~isempty(varargin{1})
@@ -254,10 +265,11 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
     
     % Create a structure to hold avg data
     avg = struct('condition', cell(1,size(condition, 1)),...
-                 'indiv', [], 'intrp', [], 'avg_intrp', [], 'blue', NaN,...
+                 'indiv', [], 'intrp', [], 'avg_intrp', [], ...
+                 'avg_blue', NaN, 'blue', NaN,...
                  'max_n', [], 'avg_n', [], 'min_n', [], 'sum_n', [],...
                  'pts', [], 'hull_pts', [], 'hull_area', []);
-
+    
     % Initialize variables
     j = false(size(condition, 1), size(data, 2));
     init_zeros = zeros(size(cat(1, data.time), 1), 1);
@@ -387,8 +399,10 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
             end
 
             % If normalized
-            if m == 1
-                time_norm = 'max 12';
+            if m == 1 %&& ~isnan(reps(r).t_norm)
+%                 time_norm = 'max 12';
+%                 time_norm = 'max 13';
+                time_norm = 'input';
 %                 max_field = 'n';
                 max_field = 'avg_I';
 
@@ -407,7 +421,7 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
                     [~, tn] = max(avg(i).indiv{r}.(max_field)(reps(r).nuc_cycle(2,1):reps(r).nuc_cycle(2,2),1));
                     tn = tn + reps(r).nuc_cycle(2,1) - 1;
                 end
-                
+
                 % Normalize data by value saved in index tn
                 if isfield(reps, 'A')
                     avg(i).indiv{r}.n = avg(i).indiv{r}.n ./...
@@ -415,6 +429,7 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
                     avg(i).indiv{r}.A = avg(i).indiv{r}.A ./...
                                         avg(i).indiv{r}.A(tn,1);
                 end
+
                 if isfield(reps, 'avg_I')
                     avg(i).indiv{r}.avg_I = avg(i).indiv{r}.avg_I ./...
                                             avg(i).indiv{r}.avg_I(tn,1);
@@ -484,15 +499,21 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
         min_t = min(tbl_tidy.t(strcmp(tbl_tidy.condition, avg(i).condition{1})));
         max_t = max(tbl_tidy.t(strcmp(tbl_tidy.condition, avg(i).condition{1})));
         
+        intrp_field = {'n','A','avg_I','max_I','sum_I'};
+%             intrp_field = {'avg_I'};
         % Initilize variables
-        temp_intrp = zeros(size((min_t:0.2:max_t)', 1), size(reps, 2));
+        temp_intrp = zeros(size((min_t:0.2:max_t)', 1), size(reps, 2), size(intrp_field,2));
+
+        % Initialize table by replicating an array of zeros for each
+        % variable
+        init_tbl_intrp = repmat({zeros(size((min_t:0.2:max_t)', 1), 1)}, 6, 1);
+
+        avg(i).avg_intrp = table(init_tbl_intrp{:},...
+                            'VariableNames', {'t', 'n', 'A', 'avg_I',...
+                                              'max_I', 'sum_I'});
         
         % For each replicate
         for r = 1:size(reps, 2)
-            % Initialize table by replicating an array of zeros for each
-            % variable
-            init_tbl_intrp = repmat({zeros(size((min_t:0.2:max_t)', 1), 1)}, 6, 1);
-
             % Make a table using the cell array, so that there are t rows
             % and 2 column arrays in each table variable
             avg(i).intrp{r} = table(init_tbl_intrp{:},...
@@ -501,20 +522,21 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
             
             % Save the interperolated time
             avg(i).intrp{r}.t = (min_t:0.2:max_t)';
-            
-%             intrp_field = 'n';
-            intrp_field = 'avg_I';
 
-            % Interpolate the data for the given time
-            avg(i).intrp{r}.(intrp_field) = interp1(avg(i).indiv{r}.t(:,1),...
-                avg(i).indiv{r}.(intrp_field)(:,1), avg(i).intrp{r}.t, 'makima', NaN);
-
-            % Save the interpolated values in an array for averaging
-            temp_intrp(:,r) = avg(i).intrp{r}.(intrp_field);
+            for w = 1:size(intrp_field,2)
+                % Interpolate the data for the given time
+                avg(i).intrp{r}.(intrp_field{w}) = interp1(avg(i).indiv{r}.t(:,1),...
+                    avg(i).indiv{r}.(intrp_field{w})(:,1), avg(i).intrp{r}.t, 'makima', NaN);
+                % Save the interpolated values in an array for averaging
+                temp_intrp(:,r,w) = avg(i).intrp{r}.(intrp_field{w});
+            end
         end
-        
-        % Conctenate the time, mean, and error for the interpolated values
-        avg(i).avg_intrp = cat(2, (min_t:0.2:max_t)', mean(temp_intrp, 2, 'omitnan'), calc_error(temp_intrp, varargin{8}, 2));
+
+        for w = 1:size(intrp_field,2)
+            % Conctenate the time, mean, and error for the interpolated values
+            avg(i).avg_intrp.t = (min_t:0.2:max_t)';
+            avg(i).avg_intrp.(intrp_field{w}) = cat(2, mean(temp_intrp(:,:,w), 2, 'omitnan'), calc_error(temp_intrp(:,:,w), varargin{8}, 2));
+        end
 
         
 %         % For each time point
@@ -676,7 +698,7 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
         % If no blue light illumination was used
         if all(isnan([data(j(i,:)).blue_light]))
             % Specify no blue light using NaN
-            avg(i).blue = [NaN; NaN];
+            avg(i).avg_blue = [NaN; NaN];
         else
             % Otherwise average the blue light start and stop times for all
             % data points that have the given condition
@@ -709,7 +731,8 @@ function [avg, tbl_tidy, data] = calc_means(condition, data, m, T, varargin)
             end
             
             % Take the average blue light window
-            avg(i).blue = squeeze(mean(blue_t,2));
+            avg(i).avg_blue = squeeze(mean(blue_t,2));
+            avg(i).blue = blue_t;
         end
     end
 end
@@ -975,16 +998,17 @@ function plot_ms2(avg, varargin)
     % of fields to plot, and determing where the blue bars should be
     % plotted
     [colors, x_label, y_label, y_blue, field] = initiate_plot(...
-                                                size(avg, 2), varargin{:});
+                                                4, varargin{:}); %size(avg, 2)
     
     % For each field
-    for j = 1:size(field, 1)
+    for j = 1:size(field, 2)
         % Initilize variables in loop and make figure
         legend_names = cell(1, size(avg, 2));
         h_avg = zeros(size(avg, 2),1);
+        h_indiv_legend = zeros(size(avg, 2),1);
         
         % If plotting average
-        if isempty(varargin{6}) || any(strcmp(varargin{6}, 'avg'))
+        if isempty(varargin{6}) || any(strcmp(varargin{6}, 'avg')) || any(strcmp(varargin{6}, 'indiv'))
             % Make figure and use hold on to prevent overwriting plots
             figure;
             ax_avg = axes;
@@ -1014,36 +1038,39 @@ function plot_ms2(avg, varargin)
             % If plotting average
             if isempty(varargin{6}) || any(strcmp(varargin{6}, 'avg'))
                 % Save time, values/means, and error
-                x = avg(i).avg_intrp(:,1);
-                y = avg(i).avg_intrp(:,2);
-                dy = avg(i).avg_intrp(:,3);
+                x = avg(i).avg_intrp.t;
+                y = avg(i).avg_intrp.(field{j})(:,1);
+                dy = avg(i).avg_intrp.(field{j})(:,2);
     
                 % Create a filled object to display error as a shaded region
-                p = fill(ax_avg, [x;flipud(x)],[y-dy;flipud(y+dy)],colors(c,:),'linestyle','none');
+                p = fill(ax_avg, [x;flipud(x)], [y-dy;flipud(y+dy)], colors(c,:), 'linestyle', 'none');
     
                 % Set transparency to 50%
-                alpha(p, 0.5);
+                alpha(p, 0.15);
     
                 % Plot mean values
                 h_avg(i) = line(ax_avg, x, y, 'color', colors(c,:));
     
                 % Set line width and marker size
                 set(h_avg(i), 'linewidth', 4, 'markersize', 15);
-
-
             end
 
             % If plotting individual lines
-            if ~isempty(varargin{6}) && any(strcmp(varargin{6}, 'indiv'))
-                % Make figure and use hold on to prevent overwriting plots
-                figure;
-                ax_indiv = axes;
-                hold(ax_indiv, 'on');
+            if ~isempty(varargin{6}) && (any(strcmp(varargin{6}, 'indiv')) || any(strcmp(varargin{6}, 'indiv_separate')))
+                if ~isempty(varargin{6}) && any(strcmp(varargin{6}, 'indiv_separate'))
+                    % Make figure and use hold on to prevent overwriting plots
+                    figure;
+                    ax_indiv = axes;
+                    hold(ax_indiv, 'on');
 
-                % To generate lines of the same color but are brighter or
-                % darker, make beta, a factor for scaling
-                % brightness/darkness
-                beta = (-0.1 * (size(avg(i).indiv, 1) - 1)):0.2:(0.1 * (size(avg(i).indiv, 1) - 1));
+                    % To generate lines of the same color but are brighter or
+                    % darker, make beta, a factor for scaling
+                    % brightness/darkness
+                    beta = (-0.1 * (size(avg(i).indiv, 1) - 1)):0.2:(0.1 * (size(avg(i).indiv, 1) - 1));
+                else
+                    ax_indiv = ax_avg;
+                    beta = [];
+                end
 
                 % Initialize variables
                 h_indiv = zeros(size(avg(i).indiv, 1), 1);
@@ -1051,13 +1078,15 @@ function plot_ms2(avg, varargin)
                 % For each replicate
                 for k = 1:size(avg(i).indiv, 1)
                     % If beta is greater than zero
-                    if beta(k) > 0
+                    if ~isempty(beta) && beta(k) > 0
                         % Make colors lighter
                         new_color = colors(c,:).^(1-beta(k));
                     % If beta is less than or equal to 0
-                    elseif beta(k) <= 0
+                    elseif ~isempty (beta) && beta(k) <= 0
                         % Make colors darker
                         new_color = colors(c,:).^(1/(1+beta(k)));
+                    else
+                        new_color = colors(c,:);
                     end
     
                     % Plot the average data with error bars, time versus data
@@ -1077,13 +1106,13 @@ function plot_ms2(avg, varargin)
                     dy = avg(i).indiv{k}.(field{j})(:,2);
 
                     % Create a filled object to display error as a shaded region
-                    p = fill(ax_indiv, [x;flipud(x)],[y-dy;flipud(y+dy)],new_color,'linestyle','none');
+                    p = fill(ax_indiv, [x;flipud(x)], [y-dy;flipud(y+dy)], new_color, 'linestyle', 'none');
 
                     % Set transparency to 50%
-                    alpha(p, 0.5);
+                    alpha(p, 0.15);
 
                     % Plot mean values
-                    h_indiv(k) = line(ax_indiv, x,y, 'color',new_color);
+                    h_indiv(k) = line(ax_indiv, x, y, 'color', new_color);
                                 
                     % Set line width and marker size
                     set(h_indiv(k), 'linewidth', 4, 'markersize', 15);
@@ -1097,21 +1126,65 @@ function plot_ms2(avg, varargin)
     %                 end
 
                     % Set properties of plot
-                    set_plot_properties(h_indiv, ax_indiv, [], avg(i).condition{2}, x_label,...
+                    set_plot_properties(h_indiv, ax_indiv, [], [], x_label,...% avg(i).condition{2}
                         y_label{j}, varargin{:});
-                end
 
-                hold(ax_indiv, 'off');
+                    if ~any(isnan(avg(i).blue))
+                        % If plotting individual lines
+                        if ~isempty(varargin{6}) && any(strcmp(varargin{6}, 'indiv'))
+                            if any(strcmp(varargin{6}, 'indiv_separate'))
+                                hold(ax_indiv, 'on');
+                            end
+                            close_to_line = false;
+                            if close_to_line == true
+                                temp_space = [10, 10, -10];
+                                temp_y_blue = min(y(1:110),[],'all') - temp_space(k);
+                            else
+                                temp_y_blue = y_blue(i,j);
+                            end
+
+                            plot_blue_indiv = true;
+
+                            if plot_blue_indiv == true
+                                h_blue_indiv = plot(ax_indiv, [avg(i).blue(1,k),...
+                                           avg(i).blue(2,k)],[temp_y_blue, temp_y_blue],...
+                                           '.-', 'Color', [0 0.53 0.93, 0.5],...
+                                           'MarkerEdgeColor', colors(c,:),...
+                                           'Linewidth', 12,...
+                                           'MarkerSize', 40);
+                                uistack(h_blue_indiv,'bottom');
+                            else
+                                h_blue_avg = plot(ax_avg, [avg(i).avg_blue(1,b),...
+                                   avg(i).avg_blue(2,b)],[y_blue(i,j), y_blue(i,j)],...
+                                   '.-', 'Color', [0 0.53 0.93, 0.5],...
+                                   'MarkerEdgeColor', colors(c,:),...
+                                   'Linewidth', 12,...
+                                   'MarkerSize', 40);
+                                uistack(h_blue_avg,'bottom');
+                            end
+    
+                            if any(strcmp(varargin{6}, 'indiv_separate'))
+                                hold(ax_indiv, 'off');
+                            end
+                        end
+                    end
+
+                    h_indiv_legend(i) = h_indiv(k);
+                end
+                
+                if ~isempty(varargin{6}) && any(strcmp(varargin{6}, 'indiv_separate'))
+                    hold(ax_indiv, 'off');
+                end
             end
             
             % If blue light was used
-            if ~any(isnan(avg(i).blue))
+            if ~any(isnan(avg(i).avg_blue))
                 % Plot blue bars
-                for b = 1:size(avg(i).blue, 2)
+                for b = 1:size(avg(i).avg_blue, 2)
                     % If plotting average
                     if isempty(varargin{6}) || any(strcmp(varargin{6}, 'avg'))
-                        h_blue_avg = plot(ax_avg, [avg(i).blue(1,b),...
-                                   avg(i).blue(2,b)],[y_blue(i,j), y_blue(i,j)],...
+                        h_blue_avg = plot(ax_avg, [avg(i).avg_blue(1,b),...
+                                   avg(i).avg_blue(2,b)],[y_blue(i,j), y_blue(i,j)],...
                                    '.-', 'Color', [0 0.53 0.93, 0.5],...
                                    'MarkerEdgeColor', colors(c,:),...
                                    'Linewidth', 12,...
@@ -1119,28 +1192,41 @@ function plot_ms2(avg, varargin)
                         uistack(h_blue_avg,'bottom');
                     end
                     
-                    % If plotting individual lines
-                    if ~isempty(varargin{6}) && any(strcmp(varargin{6}, 'indiv'))
-                        hold(ax_indiv, 'on');
-                        h_blue_indiv = plot(ax_indiv, [avg(i).blue(1,b),...
-                                   avg(i).blue(2,b)],[y_blue(2,j), y_blue(2,j)],...
-                                   '.-', 'Color', [0 0.53 0.93, 0.5],...
-                                   'MarkerEdgeColor', colors(c,:),...
-                                   'Linewidth', 12,...
-                                   'MarkerSize', 40);
-                        uistack(h_blue_indiv,'bottom');
-                        hold(ax_indiv, 'off');
-                    end
+%                     % If plotting individual lines
+%                     if ~isempty(varargin{6}) && any(strcmp(varargin{6}, 'indiv'))
+%                         if any(strcmp(varargin{6}, 'indiv_separate'))
+%                             hold(ax_indiv, 'on');
+%                         end
+% 
+%                         h_blue_indiv = plot(ax_indiv, [avg(i).avg_blue(1,b),...
+%                                    avg(i).avg_blue(2,b)],[y_blue(2,j), y_blue(2,j)],...
+%                                    '.-', 'Color', [0 0.53 0.93, 0.5],...
+%                                    'MarkerEdgeColor', colors(c,:),...
+%                                    'Linewidth', 12,...
+%                                    'MarkerSize', 40);
+%                         uistack(h_blue_indiv,'bottom');
+% 
+%                         if any(strcmp(varargin{6}, 'indiv_separate'))
+%                             hold(ax_indiv, 'off');
+%                         end
+%                     end
                 end
             end
         end
         
         % If plotting average
-        if isempty(varargin{6}) || any(strcmp(varargin{6}, 'avg'))
+        if isempty(varargin{6}) || (any(strcmp(varargin{6}, 'avg')) || any(strcmp(varargin{6}, 'indiv')))
             % Set properties of plot
-            set_plot_properties(h_avg, ax_avg, legend_names, [], x_label,...
-                y_label{j}, varargin{:});
+            if isempty(varargin{6}) || any(strcmp(varargin{6}, 'avg'))
+                set_plot_properties(h_avg, ax_avg, legend_names, [], x_label,...
+                    y_label{j}, varargin{:});
+            else
+                set_plot_properties(h_indiv_legend, ax_indiv, legend_names, [], x_label,...
+                        y_label{j}, varargin{:});
+            end
+
             hold(ax_avg, 'off');
+        else
         end
     end
 end
@@ -1178,7 +1264,10 @@ function [colors, x_label, y_label, y_blue, field] = initiate_plot(n,...
               0.4660, 0.6740, 0.1880;   %green
               0.3010, 0.7450, 0.9330;   %cyan
               0.6350, 0.0780, 0.1840;   %dark red
-                   0,      0,      0];  %black
+                   0,      0,      0;   %black
+              50/256,71/256,200/256];
+
+    
     
 %     title_names = {'Mean # of Spots'};
 %     % Titles for plots
@@ -1192,10 +1281,17 @@ function [colors, x_label, y_label, y_blue, field] = initiate_plot(n,...
     
     % If data isn't normalized
     if nargin >= 5 && strcmp(varargin{5}, 'unnorm')
+        % If entered, set y-axis limits
+        if nargin >= 8 && ~isempty(varargin{3})
+            upper_y = varargin{3}(2);
+        else
+            upper_y = 200;
+        end
+
         % y values close to x-axis at 0
-        y_blue = [-20 .* ((0.5 + 1 * (n - 1)):-1:0.5); % change 1 to 20
+        y_blue = [(upper_y / -25) .* (((upper_y / 400) + (upper_y / 360) * (n - 1)):-(upper_y / 360):(upper_y / 400)); % change 1 to 20
              (0.5 + 0.75 * (n - 1)):-0.75:0.5;
-             500 .* ((0.5 + 0.75 * (n - 1)):-0.75:0.5);
+             325 .* ((1 + 0.6 * (n - 1)):-0.6:1);%500 .* ((0.5 + 0.75 * (n - 1)):-0.75:0.5);    2500 .* ((1.05 + 0.07 * (n - 1)):-0.07:1.05);
              500 .* ((0.5 + 0.75 * (n - 1)):-0.75:0.5);
              500 .* ((0.5 + 0.75 * (n - 1)):-0.75:0.5)]';
 
@@ -1206,11 +1302,11 @@ function [colors, x_label, y_label, y_blue, field] = initiate_plot(n,...
                'Intensity (arb. unit)'};
     else
         % y values close to x-axis at 0
-        y_blue = [(0.02 + 0.04 * (n - 1)):-0.04:0.02;
-             (0.02 + 0.04 * (n - 1)):-0.04:0.02;
-             (0.02 + 0.04 * (n - 1)):-0.04:0.02;
-             (0.02 + 0.04 * (n - 1)):-0.04:0.02;
-             (0.02 + 0.04 * (n - 1)):-0.04:0.02]';
+        y_blue = [-2.5 .* ((0.04 + 0.04 * (n - 1)):-0.04:0.04);
+             0.6 + ((0.02 + 0.04 * (n - 1)):-0.04:0.02);
+             0.7 + ((0.02 + 0.04 * (n - 1)):-0.04:0.02); %0.6 + ((0.02 + 0.04 * (n - 1)):-0.04:0.02);
+             0.6 + ((0.02 + 0.04 * (n - 1)):-0.04:0.02);
+             0.6 + ((0.02 + 0.04 * (n - 1)):-0.04:0.02)]';
 
         y_label = {'Number of Spots',...
                'Normalized Area (arb. unit)',...
@@ -1219,8 +1315,11 @@ function [colors, x_label, y_label, y_blue, field] = initiate_plot(n,...
                'Normalized Intensity (arb. unit)'};
     end
 
-%     field = {'n'};
-    field = {'avg_I'};
+    field = {'n', 'A', 'avg_I', 'sum_I', 'max_I'};
+%     field = {'avg_I'};
+%     field = {'sum_I'};
+%     field = {'A'};
+%     field = {'max_I'};
 %              'A';
 %              'avg_I';
 %              'max_I';
@@ -1251,18 +1350,18 @@ function set_plot_properties(h, ax, legend_names, title_names, x_label,...
     % If legend names are given
     if ~isempty(legend_names)
         % Make legend and set font size
-        legend(h, legend_names, 'Location', 'northwest', 'Fontsize', 32)
+        legend(h, legend_names, 'Location', 'northwest', 'Fontsize', 24)
         legend(ax, 'boxoff');
     end
 
-    set(ax, 'Fontsize', 40);
+    set(ax, 'Fontsize', 24);
     set(ax,'fontname','arial')
 
     if ~isempty(title_names)
-        title(ax, title_names, 'FontSize', 40);
+        title(ax, title_names, 'FontSize', 24);
     end
-    xlabel(ax, x_label, 'FontSize', 40);
-    ylabel(ax, y_label, 'FontSize', 40);
+    xlabel(ax, x_label, 'FontSize', 24);
+    ylabel(ax, y_label, 'FontSize', 24);
     
 %     % If normalized
 %     if nargin >= 8 && ~strcmp(varargin{5}, 'unnorm')
@@ -1463,7 +1562,7 @@ function [stat, p] = plot_domain(avg, varargin)
         
         % Initialize variables for data, group names, and colors
         y = NaN(max(size_arr), n.* size(avg, 2));
-        g = string(n.* size(avg, 2));
+        g = strings(n.* size(avg, 2), 1);
         c = zeros(n.* size(avg, 2), 3);
         legend_names = cell(1, size(avg, 2));
         mean_y = zeros(1.* size(avg, 2), 1);
@@ -1489,7 +1588,8 @@ function [stat, p] = plot_domain(avg, varargin)
             % value is subtracted
             y(1:size(avg(i).indiv,1), condition_range) = avg(i).(field{j}){:,nc}-norm_val; %(3*(i-1)+1):3*i
             mean_y(condition_range) = mean(avg(i).(field{j}){:,nc}-norm_val, 1, 'omitnan');
-            err_y(condition_range) = calc_error(avg(i).(field{j}){:,nc}-norm_val, 'SEM', 1);
+            err_y(condition_range) = calc_error(avg(i).(field{j}){:,nc}-norm_val, 'SD', 1);
+            
 %             g(condition_range) = string(avg(i).(field{j}).Properties.VariableNames(nc)) + " " + avg(i).condition(2);
             g(condition_range) = avg(i).condition{1};
 
@@ -1534,7 +1634,7 @@ function [stat, p] = plot_domain(avg, varargin)
                 'MarkerFaceAlpha', .85,'MarkerEdgeAlpha', .85);
         
         % Plot the mean with the error bars and set properties
-        h = errorbar(1:size(mean_y,1), mean_y, err_y, '.', 'Color', 'k');
+        h = errorbar(1:size(mean_y,1), mean_y, err_y, '.', 'Color', [0.63, 0.63, 0.63]);
         set(h, 'linewidth', 4, 'markersize', 50);
 
         % Turn off plotting without overwriting

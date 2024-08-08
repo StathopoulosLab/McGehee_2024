@@ -104,7 +104,7 @@ function [img, data] = quantify_ms2(varargin)
         img = struct('folder', cell(1,n),...
                        'name', [],...
                        'condition', [],...
-                       'signal_channels', [],...
+                       'signal_channels', 1,...
                        'background_channel', [],...
                        'raw_image', [],...
                        'threshold', [],...
@@ -516,22 +516,31 @@ function [T, mask, mask_nuc, A, I,...
                 B = imgaussfilt3(im_bg_sub, [5, 5, 0.5]);
             % Elseif image is 2D
             elseif strcmp(dims, '2D')
-                % Median filter to remove salt/pepper noise
-                J = medfilt2(im(:,:,:,t,ch(c)));
 
-%                 % Background subtraction using a gaussian filter to blur
-%                 im_bg_sub = J - imgaussfilt(J, 5);
-                
-%                 if size(J,1) == 512
-                    % Background subtraction using a gaussian filter to blur
-                    im_bg_sub = J - medfilt2(J, [5,5]);
-%                 elseif size(J,1) == 1024
-%                     % Background subtraction using a gaussian filter to blur
-%                     im_bg_sub = J - medfilt2(J, [5,5]);
-%                 end
-                
-                % Perform a gaussian blur of standard deviation 1
-                B = imgaussfilt(im_bg_sub, 2);
+                special = false;
+
+                if special == false
+                    % Median filter to remove salt/pepper noise
+                    J = medfilt2(im(:,:,:,t,ch(c)));
+
+    %                 % Background subtraction using a gaussian filter to blur
+    %                 im_bg_sub = J - imgaussfilt(J, 5);
+                    
+                    if size(J,1) == 512
+                        % Background subtraction using a gaussian filter to blur
+                        im_bg_sub = J - medfilt2(J, [5,5]);
+                    elseif size(J,1) == 1024
+                        % Background subtraction using a gaussian filter to blur
+                        im_bg_sub = J - medfilt2(J, [10,10]);
+                    end
+                    
+                    % Perform a gaussian blur of standard deviation 1
+                    B = imgaussfilt(im_bg_sub, 2);
+                elseif special == true
+                    J = imgaussfilt(im(:,:,:,t,ch(c)), 1.5);
+                    im_bg_sub = J - medfilt2(J, [25,25]);
+                    B = im_bg_sub;
+                end
             end
             
             % Code for processing each z slice individually
@@ -571,7 +580,7 @@ function [T, mask, mask_nuc, A, I,...
                     bw = bwareaopen(bw, 2);
                 elseif size(J,1) == 1024
                     % Remove small objects that are 1 pixel
-                    bw = bwareaopen(bw, 5);
+                    bw = bwareaopen(bw, 1); % used to be 5
                 end
 
                 bw = imclearborder(bw);
@@ -582,7 +591,7 @@ function [T, mask, mask_nuc, A, I,...
                 if size(J,1) == 512
                     bw_mask = imbinarize(masked_im, 0.3);
                 elseif size(J,1) == 1024
-                    bw_mask = imbinarize(masked_im, 0.2);
+                    bw_mask = imbinarize(masked_im, 0.075); % threshold was 0.2
                     se = strel('disk',5);
                     bw_mask = imclose(bw_mask,se);
                 end

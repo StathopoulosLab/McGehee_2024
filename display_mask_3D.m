@@ -355,14 +355,31 @@ function display_mask_3D(data, varargin)
             % Set the choices for the mask dropdown menu to differentiate
             % between a max projection and sum projections for both signal
             % and background
-            dd3.Items = {'Max Signal'; 'Max Background';...
-                        'Sum Signal'; 'Sum Background'};
-            dd3.Value = 'Max Signal';
+            dd3.Items = {'Sum Signal'; 'Sum Background';...
+                         'Max Signal'; 'Max Background'};
+            dd3.Value = 'Sum Signal';
+            n = [2,3,1];
+            % Save image and mask
+            [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
+        elseif size(im_field, 1) == 3
+            % Set the choices for the mask dropdown menu to differentiate
+            % between a max, sum, and avg projection for both signal and
+            % background
+            dd3.Items = {'Avg Signal'; 'Avg Background';...
+                         'Sum Signal'; 'Sum Background';...
+                         'Max Signal'; 'Max Background'};
+            dd3.Value = 'Avg Signal';
+
+            n = [3,5,1];
+            
+            % Save image and mask
+            [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
         % Else, set the choices for the mask dropdown menu to signal and
         % background
         else
             dd3.Items = {'Signal'; 'Background'};
             dd3.Value = 'Signal';
+            n = [1,1,1];
         end
 
         % Create a text label for the data set/image slider
@@ -439,6 +456,9 @@ function display_mask_3D(data, varargin)
         elseif size(mask_field, 1) == 1
             dd3.Items = {'MS2'};
             dd3.Value = 'MS2';
+        elseif size(mask_field, 1) == 4
+            dd3.Items = {'ROI','Quant','Nuclei','Single'};
+            dd3.Value = 'ROI';
         end
     end
     
@@ -968,7 +988,7 @@ function [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
     % If the mask variable is not empty
     if ~isempty(mask)
         % If the image is 8 bit
-        if isa(im, 'uint8') && ~isempty(mask)
+        if isa(im, 'uint8')
             % Make a RGB image where the original image is grayscale
             mask_im = cat(3, uint8(~mask(:,:,z,t,T)).^c(1) .* brighter,...
                              uint8(~mask(:,:,z,t,T)).^c(2) .* brighter,...
@@ -983,7 +1003,7 @@ function [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
             im = im(:,:,z,t,ch);
             % Normalize image by maximum so that it displays. The 0.5
             % factor is to approximate the brightness of original images
-            im = im./max(im(:)) .* 0.5;
+            im = im./max(im(:));
             brighter = imadjust(im, [0, B ./ 100]);
             mask_im = cat(3, double(~mask(:,:,z,t,T)).^c(1) .* brighter,...
                              double(~mask(:,:,z,t,T)).^c(2) .* brighter,...
@@ -1104,6 +1124,16 @@ function [em_h, im_h, hull_h, p_h] = display_image(uiax, z, t, im, mask,...
         end
     % Else if not diplaying mask, points, hull, or ellipses
     else
+        % If the image is 8 bit or 16 bit
+        if ~(isa(im, 'uint8') || isa(im, 'uint16'))
+            % Save image
+            im = im(:,:,z,t,ch);
+            % Normalize image by maximum so that it displays. The 0.5
+            % factor is to approximate the brightness of original images
+            im = im./max(im(:));
+            brighter = imadjust(im, [0, B ./ 100]);
+        end
+
         mask_im = brighter;
         em_h = [];
         im_h = [];
@@ -1194,12 +1224,15 @@ function [i, channels, colors, ch, color, c, z, t, T, B, n, em_vis,...
     
     % An array with the names of possible names for the drop down menu
     im_type = {'Nuclear'; 'MS2'; 'MS21'; 'MS22'; 'Signal'; 'Background';...
-           'Max Signal'; 'Max Background'; 'Sum Signal'; 'Sum Background'};
+           'Avg Signal'; 'Avg Background'; 'Sum Signal';...
+           'Sum Background'; 'Max Signal'; 'Max Background';...
+           'ROI';'Quant';'Nuclei';'Single'};
     
     % An array with the indices that correspond with the image/mask
     % selection
-    im_ind = [1,1,1; 1,2,1; 1,2,1; 1,2,2; 1,1,1; 1,2,1; 1,1,1; 1,2,1;...
-              2,3,1; 2,4,1];
+    im_ind = [1,1,1; 1,2,1; 1,2,1; 1,2,2; 1,1,1; 1,2,1;
+              3,5,1; 3,6,1; 2,3,1; 2,4,1; 1,1,1; 1,2,1;
+              1,1,1; 1,2,1; 1,3,1; 1,4,1];
 
     % Save image using first field name
     im = data(i).(im_field{1});
@@ -1243,7 +1276,11 @@ function [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n)
     
     % Save mask using mask field name that matches index in n(2) or for the
     % mask in n(3)
-    mask = data(i).(mask_field{n(2)})(:,:,:,:,:,n(3));
+    if ~isempty(mask_field)
+        mask = data(i).(mask_field{n(2)})(:,:,:,:,:,n(3));
+    else
+        mask = [];
+    end
 end
 
 function c = pick_color(color)
@@ -1319,6 +1356,19 @@ function [em_h, im_h] = plot_ellipse(uiax, data, em_vis, im_vis, n)
         % projection
         im_h = calc_ellipse_params(uiax, data.angle_im_sum,...
             data.Maj_im_sum, data.Min_im_sum, data.C_im_sum,...
+            data.pix_len, im_vis, 'y');
+        % Else if using sum projection
+    elseif n(1) == 3
+        % Calculate the values for plotting an ellipse using embryo or
+        % background data for avg projection
+        em_h = calc_ellipse_params(uiax, data.angle_em_avg,...
+            data.Maj_em_avg, data.Min_em_avg, data.C_em_avg,...
+            data.pix_len, em_vis, 'w');
+        
+        % Calculate the values for plotting an ellipse using signal for sum
+        % projection
+        im_h = calc_ellipse_params(uiax, data.angle_im_avg,...
+            data.Maj_im_avg, data.Min_im_avg, data.C_im_avg,...
             data.pix_len, im_vis, 'y');
     end
 end
