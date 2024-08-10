@@ -108,7 +108,7 @@ for j = 1:size(field, 2)
                 err_y(k) = calc_error(y(ind)','SD');
             end
             
-            figure;
+            figure('position', [656 277	264	420]);
 %             h = boxplot(y, g, 'width', .75, 'colors', [0 0 0],...
 %                 'symbol', '', 'outliersize', 25);
             hold on

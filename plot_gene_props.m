@@ -40,7 +40,11 @@ function tidy_tbl = calc_means(data)
 %       Calculates the mean and error for data
 
     % Array of colors
-    colors = [     0, 0.4470, 0.7410;   % blue
+%     colors = [[0.12156862745098039, 0.4666666666666667, 0.7058823529411765];
+%           [1.0, 0.4980392156862745, 0.054901960784313725];
+%           [0.17254901960784313, 0.6274509803921569, 0.17254901960784313]];
+    colors = [0.8500, 0.3250, 0.0980;   % red
+        0, 0.4470, 0.7410;   % blue
               0.8500, 0.3250, 0.0980;   % red
               0.4660, 0.6740, 0.1880;   % green
               0.8500, 0.3250, 0.0980;   % red
@@ -80,6 +84,8 @@ function tidy_tbl = calc_means(data)
                 unique_gene = unique(tidy_tbl.gene, 'stable');
                 c = 1:size(unique_gene,1);
                 tidy_tbl.color(ind,:) = colors(c(strcmp(tidy_tbl.gene(ind), unique_gene)),:);
+
+%                 tidy_tbl.color(ind,:) = colors(x(strcmp(tidy_tbl.condition(ind), unique_cond)),:);
 
                 if strcmp(tidy_tbl.gene(ind), 'zen') && strcmp(tidy_tbl.stage(ind), 'late')
                     tidy_tbl.color(ind,:) = colors(5,:);
@@ -123,7 +129,7 @@ function [stat, p] = plot_width(avg)
         f = figure('Position',[200,300,1000,300]);
         tiledlayout(f,1,size(genes,1));
     else
-        figure
+        figure('position', [656	277	264	420]);
     end
 
     for i = 1:size(genes,1)
@@ -188,7 +194,7 @@ function [stat, p] = plot_width(avg)
                  'xtick', 1:size(unordered_cond,1), ...
                  'xticklabels', cond_names,...
                  'XTickLabelRotation', 45,...
-                 'ylim', [-0.025, 0.825],...%[0.11, 0.23] or [-0.025, 0.825]
+                 'ylim', [0.11, 0.23],...%[0.11, 0.23] or [-0.025, 0.825]
                  'fontsize', 20);
 
         title(append('\it',genes(i)), 'FontName', 'Arial');
