@@ -101,7 +101,7 @@ function add_bar_and_spots_to_movie(im, data, varargin)
             if (nargin >=9) && ~isempty(varargin{7}) && strcmp(varargin{7}, 'RGB')
                 imshow(squeeze(im(j).RGB_image(:,:,i,:)), 'Parent', ax);
             else
-                temp_im = imadjust(img(:,:,1,i), [0/65536,9000/65536]);% [0/65536,30000/65536] and [0/65536,6000/65536], [0/65536,3000/65536], [0/65536,9000/65536]
+                temp_im = imadjust(img(:,:,1,i), [0/65536,30000/65536]);% [0/65536,30000/65536] and [0/65536,6000/65536], [0/65536,3000/65536], [0/65536,9000/65536]
                 imshow(temp_im, 'Parent', ax);
             end
             hold on;
@@ -129,7 +129,7 @@ function add_bar_and_spots_to_movie(im, data, varargin)
                         end
                     end
                 end
-            elseif 0%isfield(data, 'centers') && ~isempty(data(j).centers{i,1})
+            elseif isfield(data, 'centers') && ~isempty(data(j).centers{i,1})
                 plot(ax,data(j).centers{i,1}(:,1), data(j).centers{i,1}(:,2), ...
                 'o', 'MarkerSize', 10, 'MarkerEdgeColor', c, 'Linewidth', 1.5);
             else

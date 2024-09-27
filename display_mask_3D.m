@@ -349,33 +349,20 @@ function display_mask_3D(data, varargin)
     % The following if statement determines if the data is from
     % quantify_ms2.m or from quantify_in_situ.m
     % If max_projections is a field
-    if isfield(data, 'max_projection')
+    if isfield(data, 'avg_projection')
         % If size of field is 2
         if size(im_field, 1) == 2
-            % Set the choices for the mask dropdown menu to differentiate
-            % between a max projection and sum projections for both signal
-            % and background
-            dd3.Items = {'Sum Signal'; 'Sum Background';...
-                         'Max Signal'; 'Max Background'};
-            dd3.Value = 'Sum Signal';
-            n = [2,3,1];
-            % Save image and mask
-            [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
-        elseif size(im_field, 1) == 3
             % Set the choices for the mask dropdown menu to differentiate
             % between a max, sum, and avg projection for both signal and
             % background
             dd3.Items = {'Avg Signal'; 'Avg Background';...
-                         'Sum Signal'; 'Sum Background';...
                          'Max Signal'; 'Max Background'};
             dd3.Value = 'Avg Signal';
 
-            n = [3,5,1];
+            n = [2,3,1];
             
             % Save image and mask
             [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
-        % Else, set the choices for the mask dropdown menu to signal and
-        % background
         else
             dd3.Items = {'Signal'; 'Background'};
             dd3.Value = 'Signal';
@@ -781,38 +768,6 @@ function display_mask_3D(data, varargin)
         % Save values n, index into image and mask fields
         im_i = strcmp(im_type, dd.Value);
         n = im_ind(im_i, :);
-%         switch dd.Value
-%             case 'Nuclear'
-%                 n = 1;
-%                 m = 1;
-%             case 'MS2'
-%                 n = 2;
-%                 m = 1;
-%             case 'MS21'
-%                 n = 2;
-%                 m = 1;
-%             case 'MS22'
-%                 n = 2;
-%                 m = 2;
-%             case 'Signal'
-%                 n = 1;
-%                 m = 1;
-%             case 'Background'
-%                 n = 2;
-%                 m = 1;
-%             case 'Max Signal'
-%                 n = 1;
-%                 m = 1;
-%             case 'Max Background'
-%                 n = 2;
-%                 m = 1;
-%             case 'Sum Signal'
-%                 n = 1;
-%                 m = 1;
-%             case 'Sum Background'
-%                 n = 2;
-%                 m = 1;
-%         end
         
         % Set the image and mask to those determined by the selection
         [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n);
@@ -1224,24 +1179,18 @@ function [i, channels, colors, ch, color, c, z, t, T, B, n, em_vis,...
     
     % An array with the names of possible names for the drop down menu
     im_type = {'Nuclear'; 'MS2'; 'MS21'; 'MS22'; 'Signal'; 'Background';...
-           'Avg Signal'; 'Avg Background'; 'Sum Signal';...
-           'Sum Background'; 'Max Signal'; 'Max Background';...
+           'Avg Signal'; 'Avg Background';...
+           'Max Signal'; 'Max Background';...
            'ROI';'Quant';'Nuclei';'Single'};
     
     % An array with the indices that correspond with the image/mask
     % selection
     im_ind = [1,1,1; 1,2,1; 1,2,1; 1,2,2; 1,1,1; 1,2,1;
-              3,5,1; 3,6,1; 2,3,1; 2,4,1; 1,1,1; 1,2,1;
+              2,3,1; 2,4,1; 1,1,1; 1,2,1;
               1,1,1; 1,2,1; 1,3,1; 1,4,1];
 
     % Save image using first field name
     im = data(i).(im_field{1});
-    
-%     % If the data is produced from quantify_in_situ rearrange the
-%     % dimensions
-%     if isfield(data, 'max_projection')
-%         im = permute(im, [1,2,4,5,3]);
-%     end
 
     % Create an array for channel names based on number of channels
     channels = append('Channel ', string(1:size(im, 5)));
@@ -1267,12 +1216,6 @@ function [im, mask] = set_image_and_mask(data, im_field, mask_field, i, n)
     
     % Save image using field name that matches the index in n(1)
     im = data(i).(im_field{n(1)});
-    
-%     % If the data is produced from quantify_in_situ rearrange the
-%     % dimensions
-%     if isfield(data, 'max_projection')
-%         im = permute(im, [1,2,4,5,3]);
-%     end
     
     % Save mask using mask field name that matches index in n(2) or for the
     % mask in n(3)
@@ -1344,28 +1287,15 @@ function [em_h, im_h] = plot_ellipse(uiax, data, em_vis, im_vis, n)
         im_h = calc_ellipse_params(uiax, data.angle_im_max,...
             data.Maj_im_max, data.Min_im_max, data.C_im_max,...
             data.pix_len, im_vis, 'y');
-    % Else if using sum projection
+    % Else if using avg projection
     elseif n(1) == 2
-        % Calculate the values for plotting an ellipse using embryo or
-        % background data for sum projection
-        em_h = calc_ellipse_params(uiax, data.angle_em_sum,...
-            data.Maj_em_sum, data.Min_em_sum, data.C_em_sum,...
-            data.pix_len, em_vis, 'w');
-        
-        % Calculate the values for plotting an ellipse using signal for sum
-        % projection
-        im_h = calc_ellipse_params(uiax, data.angle_im_sum,...
-            data.Maj_im_sum, data.Min_im_sum, data.C_im_sum,...
-            data.pix_len, im_vis, 'y');
-        % Else if using sum projection
-    elseif n(1) == 3
         % Calculate the values for plotting an ellipse using embryo or
         % background data for avg projection
         em_h = calc_ellipse_params(uiax, data.angle_em_avg,...
             data.Maj_em_avg, data.Min_em_avg, data.C_em_avg,...
             data.pix_len, em_vis, 'w');
         
-        % Calculate the values for plotting an ellipse using signal for sum
+        % Calculate the values for plotting an ellipse using signal for avg
         % projection
         im_h = calc_ellipse_params(uiax, data.angle_im_avg,...
             data.Maj_im_avg, data.Min_im_avg, data.C_im_avg,...
